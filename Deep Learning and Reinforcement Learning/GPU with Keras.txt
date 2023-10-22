@@ -1,0 +1,87 @@
+import warnings
+warnings.simplefilter('ignore')
+
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' 
+
+import numpy as np
+
+import tensorflow as tf
+# Import the keras library
+from tensorflow import keras
+from tensorflow.keras import Model
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense
+from tensorflow.python.client import device_lib
+# Specify the environment variable value
+os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+# Check that CPU is used
+print(os.environ['CUDA_VISIBLE_DEVICES'])
+# Import data
+(X_train, y_train), (X_test, y_test) = keras.datasets.mnist.load_data()
+# Reshape the data
+X_train = X_train.reshape((X_train.shape[0],X_train.shape[1],X_train.shape[2],1))
+X_test = X_test.reshape((X_test.shape[0],X_test.shape[1],X_test.shape[2],1))
+
+y_train = y_train.reshape((y_train.shape[0],1))
+y_test = y_test.reshape((y_test.shape[0],1))
+%%timeit -n1 -r1
+# Building the CNN model and fitting on train data
+with tf.device('/CPU:0'):
+    model_cpu = Sequential()
+    model_cpu.add(Conv2D(input_shape = (28, 28, 1),
+                     filters=5, 
+                     padding='Same',
+                     kernel_size=(3,3)
+                     ))
+    model_cpu.add(MaxPooling2D(pool_size=(2,2)))
+    model_cpu.add(Flatten())
+    model_cpu.add(Dense(256, activation='relu'))
+    model_cpu.add(Dense(10, activation='softmax'))
+    
+    model_cpu.compile(optimizer='adam', 
+              loss=keras.losses.SparseCategoricalCrossentropy(from_logits=True),
+              metrics=['accuracy'])
+    
+    model_cpu.fit(X_train, y_train, validation_data=(X_test, y_test), epochs=5)
+print("Num GPUs Available: ", len(tf.config.list_physical_devices('GPU')))
+print(device_lib.list_local_devices())
+%%timeit -n1 -r1
+with tf.device('/device:GPU:2'):
+    model_gpu = Sequential()
+    model_gpu.add(Conv2D(input_shape = (28, 28, 1),
+                     filters=5, 
+                     padding='Same',
+                     kernel_size=(3,3)
+                     ))
+    model_gpu.add(MaxPooling2D(pool_size=(2,2)))
+    model_gpu.add(Flatten())
+    model_gpu.add(Dense(256, activation='relu'))
+    model_gpu.add(Dense(10, activation='softmax'))
+    
+    model_gpu.compile(optimizer='adam', 
+              loss=keras.losses.SparseCategoricalCrossentropy(from_logits=True),
+              metrics=['accuracy'])
+    
+    model_gpu.fit(X_train, y_train, validation_data=(X_test, y_test), epochs=5)
+# Enable tensor allocations or operations to be printed
+tf.debugging.set_log_device_placement(True)
+
+# Get list of all logical GPUs
+gpus = tf.config.list_logical_devices('GPU')
+
+# Check if there are GPUs on this computer
+if gpus:
+  # Run matrix computation on multiple GPUs
+    c = []
+    for gpu in gpus:
+        with tf.device(gpu.name):
+            a = tf.constant([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
+            b = tf.constant([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]) 
+            c.append(tf.matmul(a, b))
+
+    # Run on CPU 
+    with tf.device('/CPU:0'):
+        matmul_sum = tf.add_n(c)
+
+    print(matmul_sum)

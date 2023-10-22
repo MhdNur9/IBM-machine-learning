@@ -1,0 +1,107 @@
+from tensorflow import keras
+from keras.utils import pad_sequences
+from keras.models import Sequential
+from keras.layers import Dense, Embedding
+from keras.layers import SimpleRNN
+from keras.datasets import imdb
+from keras import initializers
+max_features = 20000  # This is used in loading the data, picks the most common (max_features) words
+maxlen = 30  # maximum length of a sequence - truncate after this
+batch_size = 32
+## Load in the data.  The function automatically tokenizes the text into distinct integers
+(x_train, y_train), (x_test, y_test) = imdb.load_data(num_words=max_features)
+print(len(x_train), 'train sequences')
+print(len(x_test), 'test sequences')
+# This pads (or truncates) the sequences so that they are of the maximum length
+x_train = pad_sequences(x_train, maxlen=maxlen)
+x_test = pad_sequences(x_test, maxlen=maxlen)
+print('x_train shape:', x_train.shape)
+print('x_test shape:', x_test.shape)
+x_train[123,:]  #Here's what an example sequence looks like
+## Let's build a RNN
+
+rnn_hidden_dim = 5
+word_embedding_dim = 50
+model_rnn = Sequential()
+model_rnn.add(Embedding(max_features, word_embedding_dim))  #This layer takes each integer in the sequence and embeds it in a 50-dimensional vector
+model_rnn.add(SimpleRNN(rnn_hidden_dim,
+                    kernel_initializer=initializers.RandomNormal(stddev=0.001),
+                    recurrent_initializer=initializers.Identity(gain=1.0),
+                    activation='relu',
+                    input_shape=x_train.shape[1:]))
+
+model_rnn.add(Dense(1, activation='sigmoid'))
+## Note that most of the parameters come from the embedding layer
+model_rnn.summary()
+rmsprop = keras.optimizers.RMSprop(learning_rate = .0001)
+
+model_rnn.compile(loss='binary_crossentropy',
+              optimizer=rmsprop,
+              metrics=['accuracy'])
+model_rnn.fit(x_train, y_train,
+          batch_size=batch_size,
+          epochs=10,
+          validation_data=(x_test, y_test))
+score, acc = model_rnn.evaluate(x_test, y_test,
+                            batch_size=batch_size)
+print('Test score:', score)
+print('Test accuracy:', acc)
+max_features = 20000  # This is used in loading the data, picks the most common (max_features) words
+maxlen = 80  # maximum length of a sequence - truncate after this
+
+(x_train, y_train), (x_test, y_test) = imdb.load_data(num_words=max_features)
+
+x_train = pad_sequences(x_train, maxlen=maxlen)
+x_test = pad_sequences(x_test, maxlen=maxlen)
+rnn_hidden_dim = 5
+word_embedding_dim = 50
+model_rnn = Sequential()
+model_rnn.add(Embedding(max_features, word_embedding_dim))  #This layer takes each integer in the sequence
+model_rnn.add(SimpleRNN(rnn_hidden_dim,
+                    kernel_initializer=initializers.RandomNormal(stddev=0.001),
+                    recurrent_initializer=initializers.Identity(gain=1.0),
+                    activation='relu',
+                    input_shape=x_train.shape[1:]))
+
+model_rnn.add(Dense(1, activation='sigmoid'))
+rmsprop = keras.optimizers.RMSprop(learning_rate = .0001)
+
+model_rnn.compile(loss='binary_crossentropy',
+              optimizer=rmsprop,
+              metrics=['accuracy'])
+model_rnn.fit(x_train, y_train,
+          batch_size=batch_size,
+          epochs=10,
+          validation_data=(x_test, y_test))
+max_features = 5000  # This is used in loading the data, picks the most common (max_features) words
+maxlen = 80  # maximum length of a sequence - truncate after this
+
+(x_train, y_train), (x_test, y_test) = imdb.load_data(num_words=max_features)
+
+x_train = pad_sequences(x_train, maxlen=maxlen)
+x_test = pad_sequences(x_test, maxlen=maxlen)
+rnn_hidden_dim = 5
+word_embedding_dim = 20
+model_rnn = Sequential()
+model_rnn.add(Embedding(max_features, word_embedding_dim))  #This layer takes each integer in the sequence
+model_rnn.add(SimpleRNN(rnn_hidden_dim,
+                    kernel_initializer=initializers.RandomNormal(stddev=0.001),
+                    recurrent_initializer=initializers.Identity(gain=1.0),
+                    activation='relu',
+                    input_shape=x_train.shape[1:]))
+
+model_rnn.add(Dense(1, activation='sigmoid'))
+rmsprop = keras.optimizers.RMSprop(learning_rate = .0001)
+
+model_rnn.compile(loss='binary_crossentropy',
+              optimizer=rmsprop,
+              metrics=['accuracy'])
+model_rnn.fit(x_train, y_train,
+          batch_size=batch_size,
+          epochs=10,
+          validation_data=(x_test, y_test))
+# Out of curiosity, run for 10 more epochs
+model_rnn.fit(x_train, y_train,
+          batch_size=batch_size,
+          epochs=10,
+          validation_data=(x_test, y_test))

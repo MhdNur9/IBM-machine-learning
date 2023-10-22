@@ -1,0 +1,136 @@
+# Preliminaries - packages to load
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+%matplotlib inline
+np.random.seed(1234)  ## This ensures we get the same data if all of the other parameters remain fixed
+
+num_obs = 100
+x1 = np.random.uniform(0,10,num_obs)
+x2 = np.random.uniform(0,10,num_obs)
+const = np.ones(num_obs)
+eps = np.random.normal(0,.5,num_obs)
+
+b = 1.5
+theta_1 = 2
+theta_2 = 5
+
+y = b*const+ theta_1*x1 + theta_2*x2 + eps
+
+x_mat = np.array([const,x1,x2]).T
+### Solve directly using sklearn
+from sklearn.linear_model import LinearRegression
+
+lr_model = LinearRegression(fit_intercept=False)
+lr_model.fit(x_mat, y)
+
+lr_model.coef_
+## Solve by matrix calculation
+np.linalg.inv(np.dot(x_mat.T,x_mat)).dot(x_mat.T).dot(y)
+## Parameters to play with 
+learning_rate = 1e-3
+num_iter = 10000
+theta_initial = np.array([3,3,3])
+def gradient_descent(learning_rate, num_iter, theta_initial):
+
+    ## Initialization steps
+    theta = theta_initial
+    theta_path = np.zeros((num_iter+1,3))
+    theta_path[0,:]= theta_initial
+
+    loss_vec = np.zeros(num_iter)
+
+    ## Main Gradient Descent loop (for a fixed number of iterations)
+    for i in range(num_iter):
+        y_pred = np.dot(theta.T,x_mat.T)
+        loss_vec[i] = np.sum((y-y_pred)**2)
+        grad_vec = (y-y_pred).dot(x_mat)/num_obs  #sum up the gradients across all observations and divide by num_obs
+        grad_vec = grad_vec
+        theta = theta + learning_rate*grad_vec
+        theta_path[i+1,:]=theta
+    return theta_path, loss_vec
+true_coef = [b, theta_1, theta_2]
+
+def plot_ij(theta_path, i, j, ax):
+    ax.plot(true_coef[i], true_coef[j],
+            marker='p', markersize=15, label='true coef', 
+            color='#778899')
+    ax.plot(theta_path[:, i],theta_path[:, j],
+            color='k', linestyle='--', marker='^', 
+            markersize=5, markevery=50)
+    ax.plot(theta_path[0, i], theta_path[0, j], marker='d', 
+            markersize=15, label='start', color='#F08080')
+    ax.plot(theta_path[-1, i], theta_path[-1, j], marker='o', 
+            markersize=15, label='finish', color='#F08080')
+    ax.set(
+        xlabel='theta'+str(i),
+        ylabel='theta'+str(j))
+    ax.axis('equal')
+    ax.grid(True)
+    ax.legend(loc='best')
+    
+
+def plot_all(theta_path, loss_vec, learning_rate, num_iter, theta_initial, gdtype='Gradient Descent'):
+    fig = plt.figure(figsize=(16, 16))
+    title = '{gdtype} in the 3d parameter space - Learning rate is {lr} // {iters} iters // starting point {initial}'
+    title = title.format(gdtype=gdtype, lr=learning_rate, 
+                         iters=num_iter, initial=theta_initial)
+    fig.suptitle(title, fontsize=20)
+    ax = fig.add_subplot(2, 2, 1)
+    plot_ij(theta_path, 0, 1, ax)
+    ax = fig.add_subplot(2, 2, 2)
+    plot_ij(theta_path, 0, 2, ax)
+    ax = fig.add_subplot(2, 2, 3)
+    plot_ij(theta_path, 1, 2, ax)
+    ax = fig.add_subplot(2, 2, 4)
+    ax.plot(loss_vec)
+    ax.set(xlabel='iterations', ylabel='squared loss')
+    ax.grid(True)
+    
+
+theta_path, loss_vec = gradient_descent(learning_rate, num_iter, theta_initial)
+plot_all(theta_path, loss_vec, learning_rate, num_iter, theta_initial)
+
+def stochastic_gradient_descent(learning_rate, num_iter, theta_initial):
+
+    ## Initialization steps
+    theta = theta_initial
+    # below are different in STOCHASTIC gradient descent
+    theta_path = np.zeros(((num_iter*num_obs)+1,3))
+    theta_path[0,:] = theta_initial
+    loss_vec = np.zeros(num_iter*num_obs)
+
+    ## Main SGD loop
+    count = 0
+    for i in range(num_iter):
+        for j in range(num_obs):
+            count+=1
+            y_pred = np.dot(theta.T,x_mat.T)
+            loss_vec[count-1] = np.sum((y-y_pred)**2)
+            grad_vec = (y[j]-y_pred[j])*(x_mat[j,:])
+            theta = theta + learning_rate*grad_vec
+            theta_path[count,:]=theta
+    return theta_path, loss_vec
+
+## Parameters to play with
+learning_rate = 1e-4
+num_iter = 100
+theta_initial = np.array([3, 3, 3])
+
+
+theta_path, loss_vec = stochastic_gradient_descent(learning_rate, 
+                                                   num_iter, 
+                                                   theta_initial)
+plot_all(theta_path, loss_vec, learning_rate, 
+         num_iter, theta_initial, 'SGD')
+## Parameters to play with
+learning_rate = 1e-4
+num_iter = 100
+theta_initial = np.array([3,3,3])
+
+
+theta_path, loss_vec = stochastic_gradient_descent(learning_rate, 
+                                                   num_iter, 
+                                                   theta_initial)
+plot_all(theta_path, loss_vec, learning_rate, num_iter, 
+         theta_initial, 'SGD')

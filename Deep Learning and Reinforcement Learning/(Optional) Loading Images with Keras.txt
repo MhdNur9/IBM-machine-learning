@@ -1,0 +1,209 @@
+def warn(*args, **kwargs):
+    pass
+
+
+import warnings
+warnings.warn = warn
+warnings.filterwarnings('ignore')
+
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' # tensorflow INFO and WARNING messages are not printed 
+import random 
+
+import pathlib
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+%matplotlib inline
+
+import PIL
+import PIL.Image
+from PIL import Image, ImageOps
+import tensorflow as tf
+
+import keras
+from keras.preprocessing import image
+import tensorflow as tf
+from tensorflow import keras
+from tensorflow.keras import layers
+from tensorflow.keras.preprocessing.image import load_img 
+from keras.models import Model
+from keras.layers import Input, Dense
+
+import cv2
+
+sns.set_context('notebook')
+sns.set_style('white')
+# This function will allow us to visualize four sample images from the loaded toy image dataset. 
+def visualize(X_train):
+    plt.rcParams['figure.figsize'] = (6,6) 
+
+    for i in range(4):
+        plt.subplot(2,2,i+1)
+        num = random.randint(0, len(X_train))
+        plt.imshow(X_train[num], cmap='gray', interpolation='none', vmin=0, vmax=255)
+        plt.title("class {}".format(y_train[num]))
+    
+    plt.tight_layout()
+print(tf.__version__)
+(X_train, y_train), (X_test, y_test) = keras.datasets.mnist.load_data()
+print(X_train.shape)
+print(X_train.dtype)
+print(y_train.shape)
+print(y_train.dtype)
+visualize(X_train)
+ENCODING_DIM = 64
+
+# Encoded representations:
+inputs = Input(shape=(784,)) 
+encoded = Dense(ENCODING_DIM, activation="sigmoid")(inputs)
+
+# Reconstructions:
+encoded_inputs = Input(shape=(ENCODING_DIM,), name='encoding')
+reconstruction = Dense(784, activation="sigmoid")(encoded_inputs)
+
+print("Encoded Input: ", encoded.shape)
+print("Reconstructed Input: ", reconstruction.shape)
+(X_train, y_train), (X_test, y_test) = keras.datasets.fashion_mnist.load_data()
+visualize(X_train) 
+print(X_train.shape)
+print(X_train.dtype)
+visualize(X_train)
+(X_train, y_train), (X_test, y_test) = keras.datasets.cifar100.load_data(label_mode = 'fine')
+print(X_train.shape)
+print(X_train.dtype)
+visualize(X_train)
+(X_train, y_train), (X_test, y_test) = keras.datasets.cifar100.load_data(label_mode = 'coarse')
+
+visualize(X_train)
+import requests
+
+URL = 'https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBMDeveloperSkillsNetwork-ML311-Coursera/labs/Module3/L1/Dog_Breeds.jpg'
+filename = URL.split('/')[-1]
+r = requests.get(URL, allow_redirects=True)
+open(filename, 'wb').write(r.content)
+img_height, img_width = 100, 100
+gray_img = load_img(
+    'Dog_Breeds.jpg',
+    target_size=(img_height, img_width),
+    interpolation='nearest', grayscale = True)
+
+color_img = load_img(
+    'Dog_Breeds.jpg',
+    target_size=(img_height, img_width),
+    interpolation='nearest', grayscale = False)
+
+
+print(type(gray_img))
+print(type(color_img))
+plt.imshow(gray_img,cmap="gray")
+plt.show()
+plt.imshow(color_img)
+plt.show()
+input_arr = tf.keras.preprocessing.image.img_to_array(color_img)
+
+
+print("image shape",input_arr.shape)
+# Convert single image to a batch
+input_arr_batch = np.array([input_arr])
+#or
+input_arr_batch=input_arr.reshape(-1,input_arr.shape[0],input_arr.shape[1],input_arr.shape[2])
+print("image shape plus batch dimension",input_arr_batch.shape)
+color_img = tf.keras.preprocessing.image.array_to_img(input_arr)
+plt.imshow(color_img)
+plt.show()
+tf.keras.preprocessing.image.save_img('dog_color_img.jpg', color_img)
+import pathlib
+dataset_url = "https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBMDeveloperSkillsNetwork-ML311-Coursera/datasets/flower_photos.tgz"
+
+# Download the data and track where it's saved using tf.keras.utils.get_file in a variable called data_dir
+data_dir = keras.utils.get_file(origin=dataset_url,
+                                   fname='flower_photos',
+                                   untar=True)
+data_dir = pathlib.Path(data_dir)
+
+for folder in data_dir.glob('[!LICENSE]*'):
+    print('The', folder.name, 'folder has', len(list(folder.glob('*.jpg'))), 'pictures')
+image_count = len(list(data_dir.glob('*/*.jpg')))
+print(image_count, 'total images')
+dandelion = list(data_dir.glob('dandelion/*'))
+PIL.Image.open(str(dandelion[1]))
+roses = list(data_dir.glob('roses/*'))
+PIL.Image.open(str(roses[1]))
+sunflowers = list(data_dir.glob('sunflowers/*'))
+PIL.Image.open(str(sunflowers[1]))
+daisy = list(data_dir.glob('daisy/*'))
+
+PIL.Image.open(str(daisy[1]))
+# The batch size simply specifies the number of images to pass through our neural network at a time, until the entire training set is passed through. 32 is the default
+batch_size = 32
+
+# Here we set the size of all the images to be 200x200
+img_height = 200
+img_width = 200
+train_ds = tf.keras.utils.image_dataset_from_directory(
+  data_dir,
+  validation_split=0.2,
+  subset="training",
+  seed=123,
+  image_size=(img_height, img_width),
+  batch_size=batch_size)
+validation_ds = tf.keras.utils.image_dataset_from_directory(
+  data_dir,
+  validation_split=0.2,
+  subset="validation",
+  seed=123,
+  image_size=(img_height, img_width),
+  batch_size=batch_size)
+class_names = train_ds.class_names
+class_names
+# .take() will take the first batch from a tensorflow dataset. 
+# In our case it has taken the first 32 images.
+first_batch = train_ds.take(1)
+
+plt.figure(figsize = (25,10))
+for img, lbl in first_batch:
+    # lets look at the first 10 images
+    for i in np.arange(10):
+        plt.subplot(2,5,i+1)
+        plt.imshow(img[i].numpy().astype('uint8'))
+        plt.title(class_names[lbl[i]])
+        plt.axis("off")
+import tensorflow as tf
+
+img_gen = tf.keras.preprocessing.image.ImageDataGenerator(
+    rescale=1.0 / 255,
+    rotation_range=20,
+    width_shift_range=0.2,
+    height_shift_range=0.2,
+    vertical_flip=True,
+)
+
+flowers_data = img_gen.flow_from_directory(data_dir)
+images, labels = next(flowers_data)
+
+print(images.shape)
+print(labels.shape)
+plt.figure(figsize=(25, 10))
+for i in range(10):
+    plt.subplot(2,5,i+1)
+    plt.imshow(images[i])
+    index = [index for index, each_item in enumerate(labels[i]) if each_item]
+    plt.title(list(flowers_data.class_indices.keys())[index[0]])
+    plt.axis("off")
+def load_image(link, target_size=None):
+    import requests
+    import shutil
+    import os
+    _, ext = os.path.splitext(link)
+    r = requests.get(link, stream=True)
+    with open('temp.' + ext, 'wb') as f:
+        r.raw.decode_content = True
+        shutil.copyfileobj(r.raw, f)
+    img = tf.keras.preprocessing.image.load_img('temp.' + ext, target_size=target_size)
+    return tf.keras.preprocessing.image.img_to_array(img)
+URL = 'https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBMDeveloperSkillsNetwork-ML311-Coursera/labs/Module3/L1/Dog_Breeds.jpg'
+
+img = load_image(URL, target_size=(100, 100))
+plt.imshow(img/255)

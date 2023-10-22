@@ -1,0 +1,457 @@
+import numpy as np
+import datetime
+import os
+import random, shutil
+import glob
+import skillsnetwork
+
+import warnings
+warnings.simplefilter('ignore')
+
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' 
+
+from matplotlib import pyplot as plt
+import seaborn as sns
+from matplotlib import pyplot
+from matplotlib.image import imread
+
+from os import makedirs,listdir
+from shutil import copyfile
+from random import seed
+from random import random
+import keras 
+import tensorflow as tf
+print(tf.__version__)
+from tensorflow.keras.models import Sequential
+from keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Dropout, InputLayer
+from keras.models import Sequential
+from keras import optimizers
+from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
+from tensorflow.keras.layers import Conv2D, MaxPooling2D,GlobalAveragePooling2D, Input
+from tensorflow.keras.layers import Dense, Dropout, Flatten
+from tensorflow.keras.models import Sequential, Model
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras.applications import InceptionV3
+from sklearn import metrics
+
+
+sns.set_context('notebook')
+sns.set_style('white')
+import skillsnetwork
+await skillsnetwork.prepare("https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBMDeveloperSkillsNetwork-ML311-Coursera/datasets/o-vs-r-split.tar.gz",
+                           overwrite=True)
+img_rows, img_cols = 150, 150
+batch_size = 32
+n_epochs = 10
+n_classes = 2
+val_split = 0.2
+verbosity = 1
+path = 'o-vs-r-split/train/'
+path_test = 'o-vs-r-split/test/'
+input_shape = (img_rows, img_cols, 3) #RGB
+labels = ['O', 'R']
+seed = 10
+checkpoint_path='ORnet.h5'
+# Create ImageDataGenerators for training and validation and testing
+train_datagen = ImageDataGenerator(
+    validation_split = val_split,
+    rescale=1.0/255.0,
+	width_shift_range=0.1, 
+    height_shift_range=0.1, 
+    horizontal_flip=True
+)
+
+val_datagen = ImageDataGenerator(
+    validation_split = val_split,
+    rescale=1.0/255.0,
+	width_shift_range=0.1, 
+    height_shift_range=0.1, 
+    horizontal_flip=True
+)
+
+test_datagen = ImageDataGenerator(
+    rescale=1.0/255.0
+)
+# use the labels defined before to 
+# find number of images belonging to each category
+train_generator = train_datagen.flow_from_directory(
+    directory = path,
+    classes = labels,
+    seed = seed,
+    batch_size = batch_size, 
+    class_mode='binary',
+    shuffle = True,
+    target_size=(img_rows, img_rows),
+    subset = 'training'
+)
+val_generator = val_datagen.flow_from_directory(
+    directory = path,
+    classes = labels,
+    seed = seed,
+    batch_size = batch_size, 
+    class_mode='binary',
+    shuffle = True,
+    target_size=(img_rows, img_rows),
+    subset = 'validation'
+)
+test_generator = test_datagen.flow_from_directory(
+    directory = path_test,
+    classes = labels,
+    class_mode='binary',
+    seed = seed,
+    batch_size = batch_size, 
+    shuffle = True,
+    target_size=(img_rows, img_rows)
+)
+IMG_DIM = (100, 100)
+
+train_files = glob.glob('./o-vs-r-split/train/O/*')
+train_imgs = [tf.keras.preprocessing.image.img_to_array(tf.keras.preprocessing.image.load_img(img, target_size=IMG_DIM)) for img in train_files]
+train_imgs = np.array(train_imgs)
+train_labels = [fn.split('/')[3].split('.')[0].strip() for fn in train_files]
+
+img_id = 0
+O_generator = train_datagen.flow(train_imgs[img_id:img_id+1], train_labels[img_id:img_id+1],
+                                   batch_size=1)
+O = [next(O_generator) for i in range(0,5)]
+fig, ax = plt.subplots(1,5, figsize=(16, 6))
+print('Labels:', [item[1][0] for item in O])
+l = [ax[i].imshow(O[i][0][0]) for i in range(0,5)]
+from keras.applications import vgg16
+input_shape = (150, 150, 3)
+
+vgg = vgg16.VGG16(include_top=False,
+                        weights='imagenet',
+                        input_shape=input_shape)
+
+
+output = vgg.layers[-1].output
+output = tf.keras.layers.Flatten()(output)
+basemodel = Model(vgg.input, output)
+basemodel.trainable = False
+for layer in basemodel.layers: layer.trainable = False
+input_shape = basemodel.output_shape[1]
+
+model = Sequential()
+model.add(basemodel)
+model.add(Dense(512, activation='relu', input_dim=input_shape))
+model.add(Dropout(0.3))
+model.add(Dense(512, activation='relu'))
+model.add(Dropout(0.3))
+model.add(Dense(1, activation='sigmoid'))
+print(model.summary())
+model.compile(loss='binary_crossentropy',
+              optimizer=optimizers.RMSprop(learning_rate=2e-5),
+              metrics=['accuracy'])
+from keras.callbacks import LearningRateScheduler
+checkpoint_path='O_R_tlearn_image_augm_cnn_vgg16.h5'
+
+# define step decay function
+class LossHistory_(keras.callbacks.Callback):
+    def on_train_begin(self, logs={}):
+        self.losses = []
+        self.lr = []
+        
+    def on_epoch_end(self, batch, logs={}):
+        self.losses.append(logs.get('loss'))
+        self.lr.append(exp_decay(len(self.losses)))
+        print('lr:', exp_decay(len(self.losses)))
+
+def exp_decay(epoch):
+    initial_lrate = 0.1
+    k = 0.1
+    lrate = initial_lrate * np.exp(-k*epoch)
+    return lrate
+
+# learning schedule callback
+loss_history_ = LossHistory_()
+lrate_ = LearningRateScheduler(exp_decay)
+
+keras_callbacks = [
+      EarlyStopping(monitor = 'loss', 
+                    patience = 5, 
+                    mode = 'min', 
+                    min_delta=0.01),
+      ModelCheckpoint(checkpoint_path, monitor='loss', save_best_only=True, mode='min')
+]
+
+callbacks_list_ = [loss_history_, lrate_, keras_callbacks]
+extract_feat_model = model.fit(train_generator, 
+                              steps_per_epoch=10, 
+                              epochs=5,
+                              validation_data=val_generator, 
+                              validation_steps=10, 
+                              verbose=1,
+                              callbacks = callbacks_list_)  
+[layer.name for layer in basemodel.layers]
+basemodel.trainable = True
+
+set_trainable = False
+
+for layer in basemodel.layers:
+    if layer.name in ['block5_conv1', 'block4_conv1']:
+        set_trainable = True
+    if set_trainable:
+        layer.trainable = True
+    else:
+        layer.trainable = False
+model = Sequential()
+model.add(basemodel)
+model.add(Dense(512, activation='relu', input_dim=input_shape))
+model.add(Dropout(0.3))
+model.add(Dense(512, activation='relu'))
+model.add(Dropout(0.3))
+model.add(Dense(1, activation='sigmoid'))
+
+checkpoint_path='O_R_tlearn_image_augm_fine_tune_vgg16.h5'
+
+
+# learning schedule callback
+loss_history_ = LossHistory_()
+lrate_ = LearningRateScheduler(exp_decay)
+
+keras_callbacks = [
+      EarlyStopping(monitor = 'loss', 
+                    patience = 5, 
+                    mode = 'min', 
+                    min_delta=0.01),
+      ModelCheckpoint(checkpoint_path, monitor='loss', save_best_only=True, mode='min')
+]
+
+callbacks_list_ = [loss_history_, lrate_, keras_callbacks]
+
+model.compile(loss='binary_crossentropy',
+              optimizer=optimizers.RMSprop(learning_rate=1e-5),
+              metrics=['accuracy'])
+              
+fine_tune_model = model.fit(train_generator, 
+                    steps_per_epoch=10, 
+                    epochs=5,
+                    callbacks = callbacks_list_,   
+                    validation_data=val_generator, 
+                    validation_steps=10, 
+                    verbose=1)       
+extract_feat_model = tf.keras.models.load_model('O_R_tlearn_image_augm_cnn_vgg16.h5')
+fine_tune_model = tf.keras.models.load_model('O_R_tlearn_image_augm_fine_tune_vgg16.h5')
+from sklearn.utils import shuffle
+
+
+IMG_DIM = (150, 150)
+
+# Read in all O and R test images file paths. Shuffle and select 50 random test images. 
+test_files_O = glob.glob('./o-vs-r-split/test/O/*')
+test_files_R = glob.glob('./o-vs-r-split/test/R/*')
+test_files = test_files_O + test_files_R
+test_files = shuffle(test_files)[0:50]
+
+# Extract label from file path
+test_imgs = [tf.keras.preprocessing.image.img_to_array(tf.keras.preprocessing.image.load_img(img, target_size=IMG_DIM)) for img in test_files]
+test_imgs = np.array(test_imgs)
+test_labels = [fn.split('/')[3].split('.')[0].strip() for fn in test_files]
+
+# Standardize
+test_imgs_scaled = test_imgs.astype('float32')
+test_imgs_scaled /= 255
+class2num_lt = lambda l: [0 if x == 'O' else 1 for x in l]
+num2class_lt = lambda l: ['O' if x < 0.5 else 'R' for x in l]
+
+test_labels_enc = class2num_lt(test_labels)
+predictions_extract_feat_model = extract_feat_model.predict(test_imgs_scaled, verbose=0)
+predictions_fine_tune_model = fine_tune_model.predict(test_imgs_scaled, verbose=0)
+predictions_extract_feat_model = num2class_lt(predictions_extract_feat_model)
+predictions_fine_tune_model = num2class_lt(predictions_fine_tune_model)
+print('Extract Features Model')
+print(metrics.classification_report(test_labels, predictions_extract_feat_model))
+print('Fine-Tuned Model')
+print(metrics.classification_report(test_labels, predictions_fine_tune_model))
+custom_im = test_imgs_scaled[2]
+plt.imshow(custom_im)
+
+num2class_lt(extract_feat_model.predict(custom_im.reshape((1,
+                                                           test_imgs_scaled.shape[1], 
+                                                           test_imgs_scaled.shape[2], 
+                                                           test_imgs_scaled.shape[3])), verbose=0))
+custom_im = test_imgs_scaled[3]
+plt.imshow(custom_im)
+
+num2class_lt(extract_feat_model.predict(custom_im.reshape((1,
+                                                           test_imgs_scaled.shape[1], 
+                                                           test_imgs_scaled.shape[2], 
+                                                           test_imgs_scaled.shape[3])), verbose=0))
+await skillsnetwork.prepare("https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBMDeveloperSkillsNetwork-CV0101EN-Coursera/dataset/stop.zip",
+                           overwrite=True)
+await skillsnetwork.prepare("https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBMDeveloperSkillsNetwork-CV0101EN-Coursera/dataset/not_stop.zip",
+                           overwrite=True)
+await skillsnetwork.prepare("https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBMDeveloperSkillsNetwork-CV0101EN-Coursera/dataset/test_set_stop_not_stop.zip",
+                           overwrite=True)
+dataset_home = 'signs/'
+subdirs = ['train/', 'test/']
+for subdir in subdirs:
+    labeldirs = ['stop/', 'not_stop/']
+    for labeldir in labeldirs:
+        newdir = dataset_home + subdir + labeldir
+        makedirs(newdir, exist_ok = True)
+for file in listdir("stop"):
+    if file != '.DS_Store':
+        shutil.copyfile(f"stop/{file}", f"signs/train/stop/{file}")
+        
+for file in listdir("not_stop"):
+    if file != '.DS_Store':
+        shutil.copyfile(f"not_stop/{file}", f"signs/train/not_stop/{file}")
+
+test_path = "test_set_stop_not_stop/"
+for file in listdir(test_path):
+    if file.startswith("stop"):
+        shutil.copyfile(test_path+file, f"signs/test/stop/{file}")
+    elif file.startswith("not_stop"):
+        shutil.copyfile(test_path+file, f"signs/test/not_stop/{file}")      
+       
+train_stop = glob.glob('./signs/train/stop/*')
+train_not_stop = glob.glob('./signs/train/not_stop/*')
+
+fig1, ax1 = plt.subplots(1,5,figsize=(15,4))
+fig1.suptitle("STOP Signs", fontsize=18)
+l1 = [ax1[i].imshow(imread(train_stop[i])) for i in range(5)]
+
+fig2, ax2 = plt.subplots(1,5,figsize=(15,4))
+fig2.suptitle("NO STOP Signs", fontsize=18)
+l2 = [ax2[i].imshow(imread(train_not_stop[i])) for i in range(5)]
+path = "signs/train/"
+labels = ['stop', 'not_stop']
+seed = 123
+batch_size = 30
+target_size = (112,112)
+train_datagen = ImageDataGenerator(validation_split=0.2,
+                                  rescale=1./255.,
+                                  rotation_range=40,
+                                  width_shift_range=0.2,
+                                  height_shift_range=0.2,
+                                  shear_range=0.2,
+                                  zoom_range=0.2,
+                                  horizontal_flip=True)
+
+val_datagen = ImageDataGenerator(validation_split=0.2,
+                                  rescale=1./255.)
+train_generator = train_datagen.flow_from_directory(
+    directory = path,
+    classes = labels,
+    seed = seed,
+    batch_size = batch_size, 
+    class_mode='binary',
+    shuffle = True,
+    target_size=target_size,
+    subset = 'training'
+)
+
+val_generator = val_datagen.flow_from_directory(
+    directory = path,
+    classes = labels,
+    seed = seed,
+    batch_size = batch_size, 
+    class_mode='binary',
+    shuffle = True,
+    target_size=target_size,
+    subset = 'validation'
+)
+print(train_generator.class_indices)
+
+prob2class = lambda x: 'Stop' if x < 0.5 else 'Not Stop' 
+test_files = glob.glob('signs/test/stop/*.jpeg') + glob.glob('signs/test/not_stop/*.jpeg')
+test_files = shuffle(test_files)
+
+test_imgs = [tf.keras.preprocessing.image.img_to_array(tf.keras.preprocessing.image.load_img(img, target_size=target_size)) for img in test_files]
+test_imgs = np.array(test_imgs).astype('int')
+
+# Standardize
+test_imgs_scaled = test_imgs.astype('float32')
+test_imgs_scaled /= 255
+def build_compile_fit(basemodel):
+    
+    # flatten the output of the base model
+    x = Flatten()(basemodel.output)
+    # add a fully connected layer 
+    x = Dense(1024, activation='relu')(x)
+    # add dropout layer for regularization
+    x = Dropout(0.2)(x)
+    # add final layer for classification
+    x = Dense(1, activation='sigmoid')(x)
+
+    model = Model(basemodel.input, x)
+    model.compile(optimizer = optimizers.RMSprop(learning_rate=0.0001),
+                                                       loss='binary_crossentropy',
+                                                       metrics=['accuracy'])
+    callbacks = [EarlyStopping(monitor = 'loss', 
+                    patience = 5, 
+                    mode = 'min', 
+                    min_delta=0.01)]
+
+    model.fit(train_generator,
+              validation_data = val_generator,
+              steps_per_epoch=5, # num of batches in one epoch
+              epochs=10,
+              callbacks=callbacks)
+    
+    return model
+from keras.applications.inception_v3 import InceptionV3
+
+# initialize the base model
+basemodel = InceptionV3(input_shape=(112,112,3),
+                          include_top = False,
+                          weights = 'imagenet')
+
+for layer in basemodel.layers:
+    layer.trainable = False
+
+# call the build_compile_fit function to complete model training
+inception_v3 = build_compile_fit(basemodel)
+fig, ax = plt.subplots(2, 4, figsize=(12, 6))
+
+for i, ax in enumerate(ax.flat):
+    ax.imshow(test_imgs[i])
+    pred_class = prob2class(inception_v3.predict(test_imgs_scaled[i].reshape(1, 112, 112,3)))
+    
+    # print the predicted class label as the title of the image
+    ax.set_title(pred_class, fontsize=15)
+    ax.axis("off")
+from keras.applications.mobilenet import MobileNet
+
+# initialize the base model
+basemodel = MobileNet(input_shape=(112,112,3),
+                          include_top = False,
+                          weights = 'imagenet')
+
+for layer in basemodel.layers:
+    layer.trainable = False
+    
+# call the build_compile_fit function to complete model training
+mobile_net = build_compile_fit(basemodel)
+fig, ax = plt.subplots(2, 4, figsize=(12, 6))
+
+for i, ax in enumerate(ax.flat):
+    ax.imshow(test_imgs[i])
+    pred_class = prob2class(mobile_net.predict(test_imgs_scaled[i].reshape(1, 112, 112,3)))
+    
+    # print the predicted class label as the title of the image
+    ax.set_title(pred_class, fontsize=15)
+    ax.axis("off")
+from keras.applications import ResNet50
+
+# initialize the base model
+basemodel = ResNet50(input_shape=(112,112,3),
+                          include_top = False,
+                          weights = 'imagenet')
+
+for layer in basemodel.layers:
+    layer.trainable = False
+
+# call the build_compile_fit function to complete model training
+resnet_50 = build_compile_fit(basemodel)
+fig, ax = plt.subplots(2, 4, figsize=(12, 6))
+
+for i, ax in enumerate(ax.flat):
+    ax.imshow(test_imgs[i])
+    pred_class = prob2class(resnet_50.predict(test_imgs_scaled[i].reshape(1, 112, 112,3)))
+    
+    # print the predicted class label as the title of the image
+    ax.set_title(pred_class, fontsize=15)
+    ax.axis("off")

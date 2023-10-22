@@ -1,0 +1,246 @@
+import warnings
+warnings.simplefilter('ignore')
+
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' 
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+%matplotlib inline
+import tensorflow as tf
+print(tf. __version__)
+import skillsnetwork
+
+import keras 
+from sklearn.model_selection import train_test_split
+from sklearn.tree import DecisionTreeRegressor
+from sklearn.model_selection import ShuffleSplit
+from sklearn.model_selection import cross_val_score
+from statsmodels.tsa.seasonal import seasonal_decompose
+from dateutil.parser import parse
+import os
+import pathlib
+from scipy import signal
+from scipy.io import wavfile
+import re
+import string
+import nltk
+nltk.download('punkt')
+nltk.download('wordnet')
+nltk.download('stopwords')
+nltk.download('omw-1.4')
+from nltk.corpus import stopwords
+from nltk.tokenize import word_tokenize, sent_tokenize
+from nltk.stem import WordNetLemmatizer
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.feature_extraction.text import HashingVectorizer
+
+sns.set_context('notebook')
+sns.set_style('white')
+await skillsnetwork.prepare("https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBMDeveloperSkillsNetwork-ML311-Coursera/datasets/financial-data.zip")
+
+import pandas as pd
+
+symbols = {"TOT": "Total", "XOM": "Exxon", "CVX": "Chevron",
+           "COP": "ConocoPhillips", "VLO": "Valero Energy"}
+template_name = ("./financial-data/{}.csv")
+
+quotes = {}
+for symbol in symbols:
+    data = pd.read_csv(
+        template_name.format(symbol), index_col=0, parse_dates=True
+    )
+    quotes[symbols[symbol]] = data["open"]
+quotes = pd.DataFrame(quotes)
+quotes .head()
+import matplotlib.pyplot as plt
+
+quotes.plot()
+plt.ylabel("Quote value")
+plt.legend(bbox_to_anchor=(1.05, 0.8), loc="upper left")
+_ = plt.title("Stock values over time")
+data, target = quotes.drop(columns=["Chevron"]), quotes["Chevron"]
+data_train, data_test, target_train, target_test = train_test_split(
+    data, target, shuffle=True, random_state=0)
+data
+target
+regressor = DecisionTreeRegressor()
+cv = ShuffleSplit(random_state=0)
+regressor.fit(data_train, target_train)
+target_predicted = regressor.predict(data_test)
+# Affect the index of `target_predicted` to ease the plotting
+target_predicted = pd.Series(target_predicted, index=target_test.index)
+target_predicted 
+from sklearn.metrics import r2_score
+
+test_score = r2_score(target_test, target_predicted)
+print(f"The R2 on this single split is: {test_score:.2f}")
+target_train.plot(label="Training")
+target_test.plot(label="Testing")
+target_predicted.plot(label="Prediction")
+
+plt.ylabel("Quote value")
+plt.legend(bbox_to_anchor=(1.05, 0.8), loc="upper left")
+_ = plt.title("Model predictions using a ShuffleSplit strategy")
+data_train, data_test, target_train, target_test = train_test_split(
+    data, target, shuffle=False, random_state=0,
+)
+regressor.fit(data_train, target_train)
+target_predicted = regressor.predict(data_test)
+target_predicted = pd.Series(target_predicted, index=target_test.index)
+test_score = r2_score(target_test, target_predicted)
+print(f"The R2 on this single split is: {test_score:.2f}")
+target_train.plot(label="Training")
+target_test.plot(label="Testing")
+target_predicted.plot(label="Prediction")
+
+plt.ylabel("Quote value")
+plt.legend(bbox_to_anchor=(1.05, 0.8), loc="upper left")
+_ = plt.title("Model predictions using a split without shuffling")
+trend = pd.read_csv('https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBMDeveloperSkillsNetwork-ML311-Coursera/labs/Module4/L1/guinearice.csv', parse_dates=['date'], index_col='date')
+plt.plot(trend.values)
+seasonality = pd.read_csv('https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBMDeveloperSkillsNetwork-ML311-Coursera/labs/Module4/L1/sunspotarea.csv', parse_dates=['date'], index_col='date')
+plt.plot(seasonality.value)
+seasonality_trend = pd.read_csv('https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBMDeveloperSkillsNetwork-ML311-Coursera/labs/Module4/L1/AirPassengers.csv', parse_dates=['date'], index_col='date')
+plt.plot(seasonality_trend.value)
+# Import Data
+df = pd.read_csv('https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBMDeveloperSkillsNetwork-ML311-Coursera/labs/Module4/L1/a10.csv', parse_dates=['date'], index_col='date')
+plt.plot(df.value)
+# Additive Decomposition
+result_add = seasonal_decompose(df['value'], model='additive', extrapolate_trend='freq')
+
+# Plot
+result_add.plot()
+# Multiplicative Decomposition 
+result_mul = seasonal_decompose(df['value'], model='multiplicative', extrapolate_trend='freq')
+
+#Plot
+result_mul.plot()
+detrended = df.value.values - result_mul.trend
+plt.plot(detrended)
+plt.title('Drug Sales detrended by subtracting the trend component', fontsize=16)
+deseasonalized = df.value.values / result_mul.seasonal
+
+# Plot
+plt.plot(deseasonalized)
+df = pd.read_csv('https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBMDeveloperSkillsNetwork-ML311-Coursera/labs/Module4/L1/a10.csv', parse_dates=['date'], index_col='date')
+from scipy.interpolate import interp1d
+from sklearn.metrics import mean_squared_error
+
+df_ffill = df.ffill()
+# Print the MSE between imputed value and ground truth
+error = np.round(mean_squared_error(df['value'], df_ffill['value']), 2)
+df_ffill['value'].plot(title='Forward Fill (MSE: ' + str(error) +")", label='Forward Fill', style=".-")
+df_bfill = df.bfill()
+error = np.round(mean_squared_error(df['value'], df_bfill['value']), 2)
+df_bfill['value'].plot(title="Backward Fill (MSE: " + str(error) +")", label='Back Fill', color='firebrick', style=".-")
+
+df['rownum'] = np.arange(df.shape[0])
+df_nona = df.dropna(subset = ['value'])
+f = interp1d(df_nona['rownum'], df_nona['value'])
+df['linear_fill'] = f(df['rownum'])
+error = np.round(mean_squared_error(df['value'], df['linear_fill']), 2)
+df['linear_fill'].plot(title="Linear Fill (MSE: " + str(error) +")",label='Cubic Fill', color='green', style=".-")
+
+cols = ['Id', 'Entity', 'Sentiment', 'Tweet']
+df = pd.read_csv('https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBMDeveloperSkillsNetwork-ML311-Coursera/labs/Module4/L1/twitter_validation.csv', names = cols, header=None)
+df.head(2)
+fig = plt.figure(figsize=(8,6))
+
+df.groupby(['Sentiment']).Tweet.count().sort_values().plot.barh(
+    ylim=0, title= 'tweets per category')
+
+plt.xlabel('# of occurrences', fontsize = 12);
+def remove_punctuation(text):
+    regular_punct = list(string.punctuation)
+    for punc in regular_punct:
+        if punc in text:
+            text = text.replace(punc, ' ')
+    return text.strip().lower()
+
+df['Tweet'] = df['Tweet'].apply(remove_punctuation)
+def remove_stopwords(tweet):
+    en_stops = set(stopwords.words('english'))
+    tweet = tweet.split()
+    tweet = " ".join([word for word in tweet if not word in en_stops])  
+    return tweet
+
+df['Tweet'] = df['Tweet'].apply(remove_stopwords)
+df['Tweet'] = df['Tweet'].apply(word_tokenize)
+def lemma_wordnet(input):
+    lem = WordNetLemmatizer()
+    return [lem.lemmatize(w) for w in input]
+
+df['Tweet'] = df['Tweet'].apply(lemma_wordnet)
+# combine individual words
+
+def combine_text(input):
+    combined = ' '.join(input)
+    return combined
+
+df['Tweet'] = df['Tweet'].apply(combine_text)
+cv = CountVectorizer(ngram_range=(1, 1))
+X_train_bow = cv.fit_transform(df['Tweet'])
+print(X_train_bow[0:10,0:10].todense())
+cv = CountVectorizer(ngram_range=(1, 1))
+X_train_bow = cv.fit_transform(df['Tweet'].values.tolist()) 
+Y_train_bow = df['Sentiment']
+Y_train_bow
+cv_bbow = CountVectorizer(ngram_range=(2, 2))
+X_train_bbow = cv_bbow.fit_transform(df['Tweet']) 
+Y_train_bbow = df['Sentiment']
+Y_train_bbow
+vectorizer = TfidfVectorizer(use_idf = True, ngram_range=(1, 1))
+vectorizer.fit(df)
+X_train_tfidf = vectorizer.fit_transform(df['Tweet'])
+Y_train_tfidf = df['Sentiment'] 
+Y_train_tfidf 
+await skillsnetwork.prepare("https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBMDeveloperSkillsNetwork-ML311-Coursera/datasets/mini_speech_commands.zip")
+
+data_dir="mini_speech_commands"
+commands = np.array(tf.io.gfile.listdir(str(data_dir)))
+commands = commands[commands != './data/mini_speech_commands/README.md']
+commands
+filenames = tf.io.gfile.glob(str(data_dir) + '/*/*')
+filenames
+num_samples = len(filenames)
+print(num_samples)
+from scipy.io.wavfile import read
+test_file_name = '/no/97f4c236_nohash_3.wav'
+rate, test_file = read(data_dir+test_file_name)
+plt.plot(test_file)
+test_file_tensor = tf.io.read_file(data_dir+'/no/97f4c236_nohash_3.wav')
+test_audio, _ = tf.audio.decode_wav(coency [Hz]')
+plt.xlabel('Time [sec]')
+plt.show()
+await skillsnetwork.prepare("https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBMDeveloperSkillsNetwork-ML311-Coursera/labs/Module4/L1/human_data.txt", overwrite=True)
+human_data = pd.read_csv("human_data.txt", sep="\t")
+human_data.head()
+human_data['class'].value_counts().sort_index().plot.bar()
+plt.title("Class distribution of Human DNA")
+def kmers_funct(seq, size=6):
+    return [seq[x:x+size].lower() for x in range(len(seq) - size + 1)]
+kmers_funct('GTGCCCAGGT')
+human_data['words'] = human_data.apply(lambda x: kmers_funct(x['sequence']), axis=1)
+human_data = human_data.drop('sequence', axis=1)
+human_data.head()
+human_texts = list(human_data['words'])
+for item in range(len(human_texts)):
+    human_texts[item] = ' '.join(human_texts[item])
+#separate labels
+y_human = human_data.iloc[:, 0].values
+print("length of human text seq.:", len(human_texts))
+print("length of labels", y_human.shape)
+from sklearn.feature_extraction.text import CountVectorizer
+cv = CountVectorizer(ngram_range=(4,4)) 
+X = cv.fit_transform(human_texts)
+from sklearn.model_selection import train_test_split
+classifier = MultinomialNB(alpha=0.1)
+classifier.fit(X_train, y_train)
+from sklearn.metrics import classification_report
+y_pred = classifier.predict(X_test)
+print(classification_report(y_test, y_pred))
+

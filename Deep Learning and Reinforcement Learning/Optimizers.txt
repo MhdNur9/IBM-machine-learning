@@ -1,0 +1,297 @@
+import pandas as pd
+import numpy as np
+import time
+import sys
+
+import warnings
+warnings.simplefilter('ignore')
+
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' 
+
+from sklearn.linear_model import LogisticRegression
+from sklearn.preprocessing import OneHotEncoder, LabelEncoder, MinMaxScaler
+from sklearn.model_selection import train_test_split, learning_curve
+from sklearn import metrics
+from sklearn.neural_network import MLPClassifier
+from sklearn.metrics import classification_report, accuracy_score, confusion_matrix, precision_recall_fscore_support, precision_score, recall_score
+import matplotlib.pyplot as plt
+import seaborn as sns
+%matplotlib inline
+import keras
+import tensorflow as tf
+from tensorflow.keras.datasets import fashion_mnist
+from keras.models import Sequential
+from keras.layers import Dense, Dropout
+from keras.optimizers import SGD, RMSprop, Adam, Adagrad
+from keras.utils import to_categorical
+import matplotlib.pyplot as plt
+from tqdm.notebook import tqdm
+food_df = pd.read_csv("https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBMDeveloperSkillsNetwork-ML311-Coursera/datasets/food_items.csv")
+food_df.shape
+food_df.dtypes
+# # Get the row entries with the last col 'class'
+food_df.iloc[:, -1:].value_counts(normalize=True)
+food_df.iloc[:, -1:].value_counts().plot.bar(color=['#e67e22', '#27ae60', '#2980b9'])
+X_raw = food_df.iloc[:, :-1]
+y_raw = food_df.iloc[:, -1:]
+# Create a MinMaxScaler object
+scaler = MinMaxScaler()
+# Scaling the raw input features
+X = scaler.fit_transform(X_raw)
+# Create a LabelEncoder object
+label_encoder = LabelEncoder()
+y = label_encoder.fit_transform(y_raw.values.ravel())
+rs = 123 # set random state
+# First, let's split the training and testing dataset
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state = rs)
+print(f"Training dataset shape, X_train: {X_train.shape}, y_train: {y_train.shape}")
+print(f"Testing dataset shape, X_test: {X_test.shape}, y_test: {y_test.shape}")
+base_ann = MLPClassifier(random_state=rs,  hidden_layer_sizes=(32, 8), 
+                    solver='sgd', momentum=0, 
+                    early_stopping=True,
+                    max_iter=100)
+def fit_and_score(model, X_train, X_test, y_train, y_test):
+    start = time.time()
+    model.fit(X_train, y_train)
+    fit_time = time.time() - start
+    n_iter = model.n_iter_
+    train_score = model.score(X_train, y_train)
+    test_score = model.score(X_test, y_test)
+    loss_curve = model.loss_curve_
+    return round(fit_time, 2), n_iter, train_score, test_score
+fit_time, n_iter, train_score, test_score = fit_and_score(base_ann, X_train, X_test, y_train, y_test)
+print(f"Training converged after {n_iter} iterations with train score (accuracy) {round(train_score, 2)} \
+and test score (accuracy) {round(test_score, 2)}.")
+# Define a logistic regression model with above arguments
+lr_model = LogisticRegression(random_state=rs, max_iter = 200)
+lr_model.fit(X_train, y_train)
+lr_score = lr_model.score(X_test, y_test)
+print(f"The test score for the logistic regression is {round(lr_score, 2)}")
+def draw_cost(X, Y, Z, title):
+    fig = plt.figure()
+    fig.set_size_inches(8, 6, forward=True)
+    fig.set_dpi(100)
+    ax = plt.axes(projection='3d')
+    ax.view_init(30, 35)
+    ax.contour3D(X, Y, Z, 100, cmap=plt.cm.coolwarm)
+    ax.set_title(title)
+def one_mini_function():
+    w1 = np.linspace(-10, 10, 50)
+    w2 = np.linspace(-10, 10, 50)
+    X, Y = np.meshgrid(w1, w2)
+    Z = np.log(np.sqrt(X ** 2 + Y ** 2))
+    return X, Y, Z
+
+X, Y, Z = one_mini_function()
+draw_cost(X, Y, Z, "Cost function with the global minima")
+def multi_mini_function():
+    w1 = np.linspace(-10, 11, 50)
+    w2 = np.linspace(-10, 11, 50)
+    X, Y = np.meshgrid(w1, w2)
+    Z = X ** 2  - Y ** 2 + 4*X
+    return X, Y, Z
+
+X1, Y1, Z1 = multi_mini_function()
+draw_cost(X1, Y1, Z1, "Cost function with a saddle point in the middle")
+momentum_ann = MLPClassifier(random_state=123,  hidden_layer_sizes=(32, 8), 
+                    solver='sgd', momentum=0.9, 
+                    early_stopping=True,
+                    max_iter=100)
+fit_time, n_iter, train_score, test_score = fit_and_score(momentum_ann, X_train, X_test, y_train, y_test)
+print(f"Training converged after {n_iter} iterations with test score (accuracy) {round(test_score, 2)}")
+nesterovs_ann = MLPClassifier(random_state=123,  hidden_layer_sizes=(32, 8), 
+                    solver='sgd', momentum=0.95, 
+                    nesterovs_momentum=True,
+                    early_stopping=True,
+                    max_iter=100)
+fit_time, n_iter, train_score, test_score = fit_and_score(nesterovs_ann, X_train, X_test, y_train, y_test)
+print(f"Training converged after {n_iter} iterations with score (accuracy) {round(test_score, 2)}")
+adam_ann = MLPClassifier(random_state=123,  hidden_layer_sizes=(32, 8), 
+                    solver='adam',
+                    early_stopping=True,
+                    max_iter=100)
+fit_time, n_iter, train_score, test_score = fit_and_score(adam_ann, X_train, X_test, y_train, y_test)
+print(f"Training converged after {n_iter} iterations with score (accuracy) {round(test_score, 2)}")
+# cost function
+def cost_function(w):
+    return (w - 4) ** 2 + 2*w
+
+## take derivative
+def grad_function(w):
+    return 2*(w-4) + 2
+def plot_cost():
+    fig, axis = plt.subplots()
+    fig.set_size_inches(8, 6, forward=True)
+    fig.set_dpi(100)
+
+    x = np.linspace(0,6,100)
+    y = cost_function(x)
+    axis.plot(x, y, 'b')
+    axis.set_xlabel("Weight")
+    axis.set_ylabel("Cost")
+
+plot_cost()
+def is_converged(w0, w1):
+    return abs(w0 - w1) <= 1e-6
+
+# Implement Adam
+def adam(t, w, dw, m, v, alpha = 0.1, beta1 = 0.9, beta2 = 0.999, epsilon = 1e-8):
+    # para
+    # First-moment
+    m = beta1*m + (1-beta1)*dw
+    # Second-moment
+    v = beta2*v + (1-beta2)*(dw**2)
+    # Bias correction
+    m_unbiased = m/(1-beta1**t)
+    v_unbiased = v/(1-beta2**t)
+    # Update weights
+    w = w - alpha*(m_unbiased/(np.sqrt(v_unbiased) + epsilon))
+    return w, m, v
+w,m,v,t = 0,0,0,1
+converged = False
+w_his = []
+loss_his = []
+while not converged:
+    dw = grad_function(w)
+    w_prev = w
+    w, m, v = adam(t, w, dw, m, v)
+    loss_his.append(cost_function(w))
+    w_his.append(w)
+    if is_converged(w, w_prev):
+        break
+    else:
+        t+=1
+def plot_cost_w_grad(w_his, loss_his):
+    fig, axis = plt.subplots()
+    fig.set_size_inches(8, 6, forward=True)
+    fig.set_dpi(100)
+    x = np.linspace(-2,6,100)
+    y = cost_function(x)
+    axis.scatter(w_his, loss_his, marker='<', color='r', s=18)
+    axis.plot(x, y, 'grey')
+    axis.text(0, 16, 'Iteration 0', fontsize=8)
+    axis.text(3, 8, f'Iteration {len(loss_his)}', fontsize=8)
+    axis.set_xlabel("Weight")
+    axis.set_ylabel("Cost")
+plot_cost_w_grad(w_his, loss_his)
+NAMES = ['SGD', 'SGD_momentum', 'Adam']
+(xtrain, ytrain), (xtest, ytest) = fashion_mnist.load_data()
+xtrain = np.reshape(xtrain, (len(xtrain), -1))
+xtest = np.reshape(xtest, (len(xtest), -1))
+
+ytrain = to_categorical(ytrain)
+ytest = to_categorical(ytest)
+# normalization
+xtrain = np.apply_along_axis(lambda x: x/255, 1, xtrain)
+xtest = np.apply_along_axis(lambda x: x/255, 1, xtest)
+
+# validation set
+index = 50000
+xval, yval = xtrain[index:], ytrain[index:]
+xtrain, ytrain = xtrain[:index], ytrain[:index]
+xtrain.shape, xval.shape, xtest.sha
+model = Sequential(
+[
+    Dense(128, 
+          input_shape=xtrain.shape[1:],
+          activation='relu', 
+          name='dense_1'),
+    Dense(64, 
+          activation='relu', 
+          name='dense_2'),
+    Dropout(0.2),
+    Dense(10, 
+          activation='softmax', 
+          name='dense_3')
+], name='Sequential')
+
+model.build(input_shape=xtrain.shape[1:])
+model.summary()
+# params
+epochs = 10
+batch_size = 64
+shuffle = True
+
+# dicts for storing results
+loss      = {opt:[] for opt in NAMES}
+val_loss  = {opt:[] for opt in NAMES}
+acc       = {opt:[] for opt in NAMES}
+val_acc   = {opt:[] for opt in NAMES}
+test_acc  = {}
+test_loss = {}
+weights = model.get_weights().copy()
+
+with tqdm(desc='Training', total=len(NAMES*epochs)) as pbar:
+    for name in NAMES:
+        optimizer=''
+        
+        # prepare model
+        model.set_weights(weights)
+        if name == 'SGD':
+            optimizer= SGD(lr=0.001)
+        elif name=='SGD_momentum':
+            optimizer=SGD(lr=0.001, momentum=0.9)
+        elif name=='Adam':
+            optimizer=Adam(lr=0.001, beta_1=0.9, beta_2=0.999)
+        print('Optimizer: ', name)
+        model.compile(optimizer=optimizer, loss='categorical_crossentropy', metrics=['acc'])
+        
+        # train model
+        for epoch in range(epochs):
+            his = model.fit(xtrain, ytrain,
+                            epochs=1,
+                            batch_size=batch_size,
+                            validation_data=(xval, yval),
+                            shuffle=shuffle,
+                            verbose=0)
+            
+            # update dictionaries
+            loss[name].append(his.history['loss'][0])
+            val_loss[name].append(his.history['val_loss'][0])
+            acc[name].append(his.history['acc'][0])
+            val_acc[name].append(his.history['val_acc'][0])   
+            pbar.update(1)
+            
+        # inference
+        t_loss, t_acc = model.evaluate(xtest, ytest, verbose=0)
+        test_loss[name] = t_loss
+        test_acc[name] = t_acc
+fig, axs = plt.subplots(2, 2, figsize=(13, 7))
+plt.tight_layout()
+plt.subplots_adjust(hspace=0.2)
+
+
+for index, result, title in zip([[0, 0], [0, 1], [1, 0], [1, 1]], 
+                                [loss, val_loss, acc, val_acc], 
+                                ['loss', 'val_loss', 'acc', 'val_acc']):
+    i, j = index
+    for name, values in result.items():
+        axs[i, j].plot(values, label=name)
+        axs[i, j].set_title(title, size=15)
+        axs[i, j].set_xticks([e for e in range(epochs)])
+        axs[i, j].legend(loc="best", prop={'size': 10})
+w, h = 28, 28
+fashion_mnist_labels = ["T-shirt/top",  # index 0
+                        "Trouser",      # index 1
+                        "Pullover",     # index 2 
+                        "Dress",        # index 3 
+                        "Coat",         # index 4
+                        "Sandal",       # index 5
+                        "Shirt",        # index 6 
+                        "Sneaker",      # index 7 
+                        "Bag",          # index 8 
+                        "Ankle boot"]   # index 9
+
+y_hat = model.predict(xtest)
+
+figure = plt.figure(figsize=(20, 8))
+for i, index in enumerate(range(16)):
+    
+    ax = figure.add_subplot(4, 4, i + 1, xticks=[], yticks=[])
+    ax.imshow(np.squeeze(xtrain.reshape(xtrain.shape[0], w, h, 1)[index]))
+    predict_index = np.argmax(y_hat[index])
+    true_index = np.argmax(ytest[index])
+    ax.set_title("{} ({})".format(fashion_mnist_labels[predict_index],
+                                  fashion_mnist_labels[true_index]),
+                                  color=("green" if predict_index == true_index else "red"))

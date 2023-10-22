@@ -1,0 +1,226 @@
+import cv2
+from urllib.request import urlopen
+from PIL import Image
+import IPython
+import numpy as np
+from matplotlib import pyplot as plt
+import pandas as pd, numpy as np
+from keras.datasets import mnist, fashion_mnist
+import random
+from sklearn.preprocessing import OneHotEncoder
+from tensorflow.keras.losses import CategoricalCrossentropy,SparseCategoricalCrossentropy,BinaryCrossentropy
+from sklearn.datasets import make_blobs
+from mlxtend.plotting import plot_decision_regions
+import tensorflow as tf
+print(tf.__version__)
+from sklearn import preprocessing
+from tensorflow.keras.utils import to_categorical
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense
+def generate_multiclass_blobs(num_samples_total, training_split, cluster_centers, num_classes, loss_function_used):
+    X, targets = make_blobs(n_samples = num_samples_total, centers = cluster_centers, n_features = num_classes, center_box=(0, 1), cluster_std = 1.5)
+    categorical_targets = to_categorical(targets)
+    X_training = X[training_split:, :]
+    X_testing = X[:training_split, :]
+    Targets_training = categorical_targets[training_split:]
+    Targets_testing = categorical_targets[:training_split].astype(np.int32)
+    return X_training, Targets_training, X_testing, Targets_testing
+
+
+def generate_binary_blobs(num_samples_total, training_split, loss_function_used):
+    X, targets = make_blobs(n_samples = num_samples_total, centers = [(0,0), (15,15)], n_features = 2, center_box=(0, 1), cluster_std = 2.5)
+    targets[np.where(targets == 0)] = -1
+    X_training = X[training_split:, :]
+    X_testing = X[:training_split, :]
+    Targets_training = targets[training_split:]
+    Targets_testing = targets[:training_split]
+    return X_training, Targets_training, X_testing, Targets_testing
+num_samples = 1000
+test_split = 250
+cluster_centers = [(15,0), (30,15)]
+num_classes = len(cluster_centers)
+loss_function_used = BinaryCrossentropy(from_logits=True)
+X_training, Targets_training, X_testing, Targets_testing=generate_binary_blobs(num_samples, test_split, loss_function_used)
+
+plt.figure(figsize=(4, 4))
+plt.scatter(X_training[:,0], X_training[:,1])
+plt.title('Linearly separable data')
+plt.xlabel('X1')
+plt.ylabel('X2')
+plt.show()
+feature_vector_shape = X_training.shape[1]
+input_shape = (feature_vector_shape,)
+
+model = Sequential()
+model.add(Dense(12, input_shape=input_shape, activation='relu', kernel_initializer='he_uniform'))
+model.add(Dense(8, activation='relu', kernel_initializer='he_uniform'))
+model.add(Dense(1, activation = 'sigmoid'))
+model.compile(loss=loss_function_used, optimizer=tf.keras.optimizers.Adam(lr=0.01), metrics=['accuracy'])
+history = model.fit(X_training, Targets_training, epochs=30, batch_size=5, verbose=1, validation_split=0.2)
+test_results = model.evaluate(X_testing, Targets_testing, verbose=1)
+print(f'Test results - Loss: {test_results[0]} - Accuracy: {test_results[1]*100}%')
+plot_decision_regions(X_testing, Targets_testing, clf=model, legend=2)
+plt.figure(figsize=(4, 4))
+plt.show()
+num_samples = 1000
+train_split = 250
+cluster_centers = [(-10, 5), (0, 0), (10, 5)]
+num_classes = len(cluster_centers)
+loss_function_used = CategoricalCrossentropy(from_logits=True)
+X_training, Targets_training, X_testing, Targets_testing= generate_multiclass_blobs(num_samples, train_split,
+              cluster_centers, num_classes,
+              loss_function_used)
+plt.scatter(X_training[:,0], X_training[:,1])
+plt.title('Linearly separable data')
+plt.xlabel('X1')
+plt.ylabel('X2')
+plt.show()
+feature_vector_shape = X_training.shape[1]
+input_shape = (feature_vector_shape,)
+
+model = Sequential()
+model.add(Dense(12, input_shape=input_shape, activation='relu', kernel_initializer='he_uniform'))
+model.add(Dense(8, activation='relu', kernel_initializer='he_uniform'))
+model.add(Dense(num_classes, activation='softmax'))
+model.compile(loss=loss_function_used, optimizer=tf.keras.optimizers.Adam(lr=0.001), metrics=['accuracy'])
+history = model.fit(X_training, Targets_training, epochs=30, batch_size=5, verbose=1, validation_split=0.2)
+test_results = model.evaluate(X_testing, Targets_testing, verbose=1)
+print(f'Test results - Loss: {test_results[0]} - Accuracy: {test_results[1]*100}%')
+class Onehot2Int(object):
+
+    def __init__(self, model):
+        self.model = model
+
+    def predict(self, X):
+        y_pred = self.model.predict(X)
+        return np.argmax(y_pred, axis=1)
+
+# fit keras_model
+keras_model_no_ohe = Onehot2Int(model)
+# Plot decision boundary
+plot_decision_regions(X_testing, np.argmax(Targets_testing, axis=1), clf=keras_model_no_ohe, legend=3)
+plt.show()
+(X_train, y_train), (X_test, y_test) = mnist.load_data() 
+print("X_train shape", X_train.shape)
+print("y_train shape", y_train.shape)
+print("X_test shape", X_test.shape)
+print("y_test shape", y_test.shape)
+plt.rcParams['figure.figsize'] = (6,6) 
+
+for i in range(4):
+    plt.subplot(2,2,i+1)
+    num = random.randint(0, len(X_train))
+    plt.imshow(X_train[num], cmap='gray', interpolation='none')
+    plt.title("class {}".format(y_train[num]))
+    
+plt.tight_layout()
+X_train = X_train.reshape(X_train.shape[0], X_train.shape[1]* X_train.shape[2])
+X_test = X_test.reshape(X_test.shape[0], X_test.shape[1] * X_test.shape[2])
+
+print(X_train.shape)
+print(X_test.shape)
+X_train = X_train.astype('float32')
+X_test = X_test.astype('float32')
+
+X_train /= 255
+X_test /= 255
+y_train
+enc = OneHotEncoder(sparse=False)
+enc.fit(y_train.reshape(-1, 1))
+print(enc.categories_)
+y_train_enc = enc.transform(y_train.reshape(-1,1))
+y_test_enc = enc.transform(y_test.reshape(-1,1))
+feature_vector_shape = X_train.shape[1]
+input_shape = (feature_vector_shape,)
+num_classes = 10
+loss_function_used=CategoricalCrossentropy(from_logits=True)
+model = Sequential()
+model.add(Dense(12, input_shape=input_shape, activation='relu', kernel_initializer='he_uniform'))
+model.add(Dense(8, activation='relu', kernel_initializer='he_uniform'))
+model.add(Dense(num_classes, activation='softmax'))
+model.compile(loss=loss_function_used, optimizer=tf.keras.optimizers.Adam(lr=0.001), metrics=['accuracy'])
+history = model.fit(X_train, y_train_enc, epochs=25, batch_size=5, verbose=1, validation_split=0.2)
+test_results = model.evaluate(X_test, y_test_enc, verbose=1)
+print(f'Test results - Loss: {test_results[0]} - Accuracy: {test_results[1]*100}%')
+URL = 'https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBMDeveloperSkillsNetwork-ML311-Coursera/images/house_number_5.jpeg'
+image = Image.open(urlopen(URL)).convert('RGB')
+image
+feature_vector_shape,input_shape = 784,784
+num_classes = 10
+loss_function_used = CategoricalCrossentropy(from_logits=True)
+model = Sequential()
+model.add(Dense(12, input_shape=(input_shape,), activation='relu', kernel_initializer='he_uniform'))
+model.add(Dense(8, activation='relu', kernel_initializer='he_uniform'))
+model.add(Dense(num_classes, activation='softmax'))
+
+model.compile(loss=loss_function_used, optimizer=tf.keras.optimizers.Adam(lr=0.001), metrics=['accuracy'])
+history = model.fit(X_train, y_train_enc, epochs=25, batch_size=5, verbose=1, validation_split=0.2)
+img_rows, img_cols = 28, 28
+img = Image.fromarray(np.uint8(image)).convert('L')
+img_gray = img.resize((img_rows, img_cols), Image.ANTIALIAS)
+img_gray
+arr = np.array(img_gray)
+arr = arr.reshape((img_cols*img_rows))
+arr = np.expand_dims(arr, axis=0)
+prediction = model.predict(arr)
+np.argmax(prediction)
+(X_train, y_train), (X_test, y_test) = fashion_mnist.load_data()
+
+
+plt.rcParams['figure.figsize'] = (6,6) 
+
+for i in range(4):
+    plt.subplot(2,2,i+1)
+    num = random.randint(0, len(X_train))
+    plt.imshow(X_train[num], cmap='gray', interpolation='none')
+    plt.title("class {}".format(y_train[num]))
+    
+plt.tight_layout()
+X_train = X_train.reshape(X_train.shape[0], X_train.shape[1]* X_train.shape[2])
+X_test = X_test.reshape(X_test.shape[0], X_test.shape[1] * X_test.shape[2])
+
+print(X_train.shape)
+print(X_test.shape)
+
+X_train = X_train.astype('float32')
+X_test = X_test.astype('float32')
+
+X_train /= 255
+X_test /= 255
+enc = OneHotEncoder(sparse=False)
+enc.fit(y_train.reshape(-1, 1))
+print(enc.categories_)
+y_train_enc = enc.transform(y_train.reshape(-1,1))
+y_test_enc = enc.transform(y_test.reshape(-1,1))
+feature_vector_shape = X_train.shape[1]
+input_shape = (feature_vector_shape,)
+num_classes = 10
+loss_function_used = CategoricalCrossentropy(from_logits=True)
+
+model = Sequential()
+model.add(Dense(12, input_shape=input_shape, activation='relu', kernel_initializer='he_uniform'))
+model.add(Dense(8, activation='relu', kernel_initializer='he_uniform'))
+model.add(Dense(num_classes, activation='softmax'))
+
+
+model.compile(loss=loss_function_used, optimizer=tf.keras.optimizers.Adam(lr=0.001), metrics=['accuracy'])
+history = model.fit(X_train, y_train_enc, epochs=25, batch_size=5, verbose=1, validation_split=0.2)
+
+test_results = model.evaluate(X_test, y_test_enc, verbose=1)
+print(f'Test results - Loss: {test_results[0]} - Accuracy: {test_results[1]*100}%')
+feature_vector_shape = X_train.shape[1]
+input_shape = (feature_vector_shape,)
+num_classes = 10
+loss_function_used = SparseCategoricalCrossentropy()
+
+model = Sequential()
+model.add(Dense(12, input_shape=input_shape, activation='relu', kernel_initializer='he_uniform'))
+model.add(Dense(8, activation='relu', kernel_initializer='he_uniform'))
+model.add(Dense(num_classes, activation='softmax'))
+
+
+model.compile(loss=loss_function_used, optimizer=tf.keras.optimizers.Adam(lr=0.001), metrics=['accuracy'])
+history = model.fit(X_train, y_train, epochs=25, batch_size=5, verbose=1, validation_split=0.2)
+
+test_results = model.evaluate(X_test, y_test_enc, verbose=1)
+print(f'Test results - Loss: {test_results[0]} - Accuracy: {test_results[1]*100}%')

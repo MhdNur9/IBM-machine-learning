@@ -1,0 +1,210 @@
+def warn(*args, **kwargs):
+    pass
+import warnings
+warnings.warn = warn
+warnings.filterwarnings('ignore')
+
+import importlib
+import numpy as np
+
+import matplotlib.pyplot as plt
+from numpy.random import seed
+seed(1)
+
+import  tensorflow as tf
+
+tf.random.set_seed(1234)
+from tensorflow.keras.layers import Embedding, Dense, Flatten,Dropout
+from tensorflow.keras.models import Sequential
+
+from keras import preprocessing
+from tensorflow.keras.preprocessing.text import Tokenizer
+from tensorflow.keras.preprocessing.sequence import pad_sequences
+
+from tensorflow.keras import regularizers
+
+# Print tensorflow version, should be greater than 2.9.0
+print(tf.__version__)
+def display_metrics(history):
+
+    n = len(history.history["loss"])
+
+    fig = plt.figure(figsize=(12, 6))
+    ax = fig.add_subplot(1, 2, 1)
+    ax.plot(range(n), (history.history["loss"]),'r', label="Train Loss")
+    ax.plot(range(n), (history.history["val_loss"]),'b', label="Validation Loss")
+    ax.legend()
+    ax.set_title('Loss over iterations')
+
+    ax = fig.add_subplot(1, 2, 2)
+    ax.plot(range(n), (history.history["acc"]),'r', label="Train Acc")
+    ax.plot(range(n), (history.history["val_acc"]),'b', label="Validation Acc")
+    ax.legend(loc='lower right')
+    ax.set_title('Accuracy over iterations')
+def plot_embedding(X_embedded,start=100,stop=300,sample=10):
+    fig, ax = plt.subplots()
+    ax.scatter(X_embedded[start:stop:sample,0], X_embedded[start:stop:sample,1])
+    for i in range(start,stop,sample):
+        ax.annotate(REVERSE_LOOKUP[i+1], (X_embedded[i,0], X_embedded[i,1]))
+def rotten_tomato_score(p_yx):
+    return ["rotten"  if p<=0.60 else "fresh"for p in p_yx ]
+        
+samples=['I hate cats', 
+         'the dog is brown and I like cats', 
+         'for the']
+tokenizer = Tokenizer(num_words=11)
+tokenizer.fit_on_texts(samples) 
+word_counts=tokenizer.word_counts
+word_counts
+for key in tokenizer.word_counts.keys():
+    
+    print(key)
+    print(tokenizer.texts_to_matrix([key]))
+for sample  in samples:
+    
+    print(sample)
+    print(tokenizer.texts_to_matrix([sample]))
+modes=[ "binary", "count", "tfidf", "freq"]
+for mode in modes: 
+    print("mode:",mode)
+    for sample  in samples:
+        
+        print(sample)
+        print(tokenizer.texts_to_matrix([sample],mode=mode))
+for sample  in samples:
+    
+    print(sample)
+    print(tokenizer.texts_to_sequences([sample]))
+import tensorflow as tf
+from tensorflow.keras.layers import Embedding, Dense, Flatten
+from tensorflow.keras.models import Sequential
+from tensorflow.keras import Input
+
+import numpy as np
+
+
+model = Sequential()
+
+input_dim=3
+output_dim=1
+input_length=1
+model.add(Embedding(input_dim=input_dim, output_dim=output_dim,input_length=input_length))
+
+model.summary()
+model.get_weights()
+weights=np.array([0,1,2]).reshape(-1,1)
+
+model.set_weights([weights])
+model.get_weights()
+for n in range(3):
+    x=np.array([[n]])
+    print("input x={}".format(n))
+    z=model.predict(x)
+    print("output z={}".format(z.tolist()))
+z = model.predict([[0],[1],[2]])
+print("different samples in the batch dimension:\n",z)
+z = model.predict([0,1,2])
+print(" multiple samples in a row: \n",z)
+input_dim=4
+output_dim=2
+input_length=1
+model = Sequential()
+model.add(Embedding(input_dim=input_dim, output_dim=output_dim, input_length=input_length))
+model.summary()
+weights=np.array([[0,0],[0,1],[1,0],[1,1]])
+model.set_weights([weights])
+model.get_weights()
+for n in range(4):
+    x=np.array([[n]])
+    print("input x={}".format(n))
+    z=model.predict(x)
+    print("input binary={}".format(z.tolist() ))
+samples=['I hate cats','the dog is brown and I like cats','for the']
+for sample in samples:
+    print("sample:",sample)
+    print("length:",len(sample))
+tokenizer = Tokenizer(num_words=12)
+tokenizer.fit_on_texts(samples) 
+tokens=tokenizer.texts_to_sequences(samples)
+print("tokens",tokens)
+maxlen=9
+x =pad_sequences(tokens, maxlen=maxlen,value=0)
+x
+maxlen=9
+x =pad_sequences(tokens, maxlen=maxlen,padding="post")
+x
+maxlen=5
+x =pad_sequences(tokens, maxlen=maxlen)
+x
+from keras.datasets import imdb
+max_features = 10000
+
+# change the default parameter of np to allow_pickle=True
+np.load.__defaults__=(None, True, True, 'ASCII')
+importlib.reload(np)
+
+(x_train, y_train), (x_test, y_test) = imdb.load_data(num_words=max_features )
+for i,x in enumerate(x_train[0:3]):
+    print("Sequence:",i) 
+    print(x)
+word_index = imdb.get_word_index()
+REVERSE_LOOKUP={value:key for key, value in word_index.items()}
+def get_review(x):
+     return' '.join([REVERSE_LOOKUP[index ] for index in x])
+get_review(x_train[0])
+get_review(x_train[1])
+for i,x in enumerate(x_train[0:3]):
+    print("length {} of sample {}:".format(i,len(x)))
+maxlen=20
+x_train =pad_sequences(x_train, maxlen=maxlen)
+x_test =pad_sequences(x_test, maxlen=maxlen)
+x_test.shape
+model = Sequential()
+model.add(Embedding(10000, 8, input_length=20))
+model.add(Flatten())
+model.add(Dense(1, activation='sigmoid'))
+model.compile(optimizer='rmsprop', loss='binary_crossentropy', metrics=['acc'])
+model.summary()
+history = model.fit(x_train, y_train, epochs=10,batch_size=30,validation_split=0.2)
+display_metrics(history)
+p_yx=model.predict(x_test[0:10])
+rotten_tomato_score(p_yx)
+weights=model.layers[0].get_weights()[0]
+weights.shape
+from sklearn.manifold import TSNE
+tsne = TSNE(n_components=2)
+X_embedded = tsne.fit_transform(weights)
+start=1
+stop=600
+sample=10
+plot_embedding(X_embedded,start,stop,sample)
+
+start=1
+stop=100
+sample=1
+plot_embedding(X_embedded,start,stop,sample)
+model = Sequential()
+model.add(Embedding(10000, 8, input_length=20))
+model.add(Flatten())
+
+model.add(Dense(500, activation='relu'))
+model.add(Dense(250, activation='relu'))
+model.add(Dense(1, activation='sigmoid'))
+model.compile(optimizer='rmsprop', loss='binary_crossentropy', metrics=['acc'])
+history = model.fit(x_train, y_train, epochs=10,batch_size=30,validation_split=0.2)
+
+display_metrics(history)
+model = Sequential()
+model.add(Embedding(max_features, 8, input_length=maxlen))
+model.add(Flatten())
+model.add(Dense(500, kernel_initializer='normal', activation='relu',kernel_regularizer=regularizers.L2(l2=5e-3)))
+model.add(Dropout(.4))
+
+model.add(Dense(250, kernel_initializer='normal', activation='relu',kernel_regularizer=regularizers.L2(l2=5e-3)))
+model.add(Dropout(.3))
+model.add(Dense(1, activation='sigmoid'))
+model.compile(optimizer='rmsprop', loss='binary_crossentropy', metrics=['acc']) 
+model.summary()
+
+history = model.fit(x_train, y_train, epochs=10,batch_size=64, validation_split=0.2)
+display_metrics(history)

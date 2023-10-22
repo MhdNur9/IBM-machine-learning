@@ -1,0 +1,60 @@
+import warnings
+warnings.simplefilter('ignore')
+
+import numpy as np
+import matplotlib.pyplot as plt
+import pandas as pd
+import random
+
+from sklearn.neural_network import MLPClassifier
+from sklearn.model_selection import RandomizedSearchCV
+from sklearn.metrics import accuracy_score, classification_report
+digits = pd.read_csv("https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBMDeveloperSkillsNetwork-ML311-Coursera/labs/Module1/L1/data/digits.csv")
+
+labels = digits['label']
+digits = np.array(digits.drop('label', axis=1)).astype('float')
+digits.shape, labels.shape
+plt.figure(figsize=(12,4))
+for i in range(5):
+    plt.subplot(1, 5, i+1)
+    plt.imshow(random.choice(digits).reshape(28,28))
+    plt.axis("off")
+split = 0.7, 0.3 # train, test
+# normalize data
+digits /= 255.0
+
+split_ind = int(len(digits)*split[0])
+X_train, X_test, y_train, y_test = digits[:split_ind], digits[split_ind:], labels[:split_ind], labels[split_ind:]
+X_train.shape, X_test.shape
+model = MLPClassifier().fit(X_train, y_train)
+y_pred = model.predict(X_test)
+
+print(f"Using MLPClassifier with the default parameter values gives an accuracy of {accuracy_score(y_pred, y_test)}")
+print(classification_report(y_pred, y_test))
+parameters = {'hidden_layer_sizes':[50, 100, 200],
+              'alpha': [0.001, 0.01, 0.1], 
+              'max_iter': [200, 500, 800], 
+              'learning_rate_init':[0.0001, 0.001, 0.01, 0.1]}
+
+model = MLPClassifier()
+clf = RandomizedSearchCV(estimator=model, param_distributions=parameters, cv=5)
+clf.fit(X_train[:3000], y_train[:3000]) # reduce the train set size to shorten the training time
+
+print("The best parameter values found are:\n")
+print(clf.best_params_)
+
+# store the best model found in "bestmodel"
+bestmodel = clf.best_estimator_
+y_pred = bestmodel.predict(X_test)
+print(f"The accuracy score of the best model is {accuracy_score(y_test, y_pred)}\n")
+
+plt.figure(figsize=(12,8))
+for i in range(10):
+    plt.subplot(2, 5, i+1)
+    sample = random.choice(X_test)
+    plt.imshow(sample.reshape(28,28))
+    pred = bestmodel.predict(sample.reshape(1,-1))
+    plt.title(f"Predicted as {pred}")
+    plt.axis("off")
+
+plt.tight_layout()

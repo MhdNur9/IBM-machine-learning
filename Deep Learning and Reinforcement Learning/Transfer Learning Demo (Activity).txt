@@ -1,0 +1,150 @@
+import datetime
+import keras
+from keras.datasets import mnist
+from keras.models import Sequential
+from keras.layers import Dense, Dropout, Activation, Flatten
+from keras.layers import Conv2D, MaxPooling2D
+from keras import backend as K
+#from tensorflow import keras
+#from tensorflow.keras.datasets import mnist
+#from tensorflow.keras.models import Sequential
+#from tensorflow.keras.layers import Dense, Dropout, Activation, Flatten
+#from tensorflow.keras.layers import Conv2D, MaxPooling2D
+#from tensorflow.keras import backend as K
+#used to help some of the timing functions
+now = datetime.datetime.now
+# set some parameters
+batch_size = 128
+num_classes = 5
+epochs = 5
+# set some more parameters
+img_rows, img_cols = 28, 28
+filters = 32
+pool_size = 2
+kernel_size = 3
+## This just handles some variability in how the input data is loaded
+
+if K.image_data_format() == 'channels_first':
+    input_shape = (1, img_rows, img_cols)
+else:
+    input_shape = (img_rows, img_cols, 1)
+## To simplify things, write a function to include all the training steps
+## As input, function takes a model, training set, test set, and the number of classes
+## Inside the model object will be the state about which layers we are freezing and which we are training
+
+def train_model(model, train, test, num_classes):
+    x_train = train[0].reshape((train[0].shape[0],) + input_shape)
+    x_test = test[0].reshape((test[0].shape[0],) + input_shape)
+    x_train = x_train.astype('float32')
+    x_test = x_test.astype('float32')
+    x_train /= 255
+    x_test /= 255
+    print('x_train shape:', x_train.shape)
+    print(x_train.shape[0], 'train samples')
+    print(x_test.shape[0], 'test samples')
+
+    # convert class vectors to binary class matrices
+    y_train = keras.utils.to_categorical(train[1], num_classes)
+    y_test = keras.utils.to_categorical(test[1], num_classes)
+
+    model.compile(loss='categorical_crossentropy',
+                  optimizer='adadelta',
+                  metrics=['accuracy'])
+
+    t = now()
+    model.fit(x_train, y_train,
+              batch_size=batch_size,
+              epochs=epochs,
+              verbose=1,
+              validation_data=(x_test, y_test))
+    print('Training time: %s' % (now() - t))
+
+    score = model.evaluate(x_test, y_test, verbose=0)
+    print('Test score:', score[0])
+    print('Test accuracy:', score[1])
+# the data, shuffled and split between train and test sets
+(x_train, y_train), (x_test, y_test) = mnist.load_data()
+
+# create two datasets: one with digits below 5 and one with 5 and above
+x_train_lt5 = x_train[y_train < 5]
+y_train_lt5 = y_train[y_train < 5]
+x_test_lt5 = x_test[y_test < 5]
+y_test_lt5 = y_test[y_test < 5]
+
+x_train_gte5 = x_train[y_train >= 5]
+y_train_gte5 = y_train[y_train >= 5] - 5
+x_test_gte5 = x_test[y_test >= 5]
+y_test_gte5 = y_test[y_test >= 5] - 5
+# Define the "feature" layers.  These are the early layers that we expect will "transfer"
+# to a new problem.  We will freeze these layers during the fine-tuning process
+
+feature_layers = [
+    Conv2D(filters, kernel_size,
+           padding='valid',
+           input_shape=input_shape),
+    Activation('relu'),
+    Conv2D(filters, kernel_size),
+    Activation('relu'),
+    MaxPooling2D(pool_size=pool_size),
+    Dropout(0.25),
+    Flatten(),
+]
+# Define the "classification" layers.  These are the later layers that predict the specific classes from the features
+# learned by the feature layers.  This is the part of the model that needs to be re-trained for a new problem
+
+classification_layers = [
+    Dense(128),
+    Activation('relu'),
+    Dropout(0.5),
+    Dense(num_classes),
+    Activation('softmax')
+]
+# We create our model by combining the two sets of layers as follows
+model = Sequential(feature_layers + classification_layers)
+# Let's take a look
+model.summary()
+# Now, let's train our model on the digits 5,6,7,8,9
+
+train_model(model,
+            (x_train_gte5, y_train_gte5),
+            (x_test_gte5, y_test_gte5), num_classes)
+# Freeze only the feature layers
+for l in feature_layers:
+    l.trainable = False
+model.summary()
+train_model(model,
+            (x_train_lt5, y_train_lt5),
+            (x_test_lt5, y_test_lt5), num_classes)
+# Create layers and define the model as above
+feature_layers2 = [
+    Conv2D(filters, kernel_size,
+           padding='valid',
+           input_shape=input_shape),
+    Activation('relu'),
+    Conv2D(filters, kernel_size),
+    Activation('relu'),
+    MaxPooling2D(pool_size=pool_size),
+    Dropout(0.25),
+    Flatten(),
+]
+
+classification_layers2 = [
+    Dense(128),
+    Activation('relu'),
+    Dropout(0.5),
+    Dense(num_classes),
+    Activation('softmax')
+]
+model2 = Sequential(feature_layers2 + classification_layers2)
+model2.summary()
+# Now, let's train our model on the digits 0,1,2,3,4
+train_model(model2,
+            (x_train_lt5, y_train_lt5),
+            (x_test_lt5, y_test_lt5), num_classes)
+#Freeze layers
+for l in feature_layers2:
+    l.trainable = False
+model2.summary()
+train_model(model2,
+            (x_train_gte5, y_train_gte5),
+            (x_test_gte5, y_test_gte5), num_classes)

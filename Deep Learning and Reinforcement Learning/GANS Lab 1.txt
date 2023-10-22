@@ -1,0 +1,142 @@
+import warnings
+warnings.simplefilter('ignore')
+
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' 
+
+import numpy as np
+import os
+import matplotlib.pyplot as plt
+import tensorflow as tf
+print(tf.__version__)
+from tensorflow.keras import layers
+import time
+from tensorflow.keras import models
+from tqdm import tqdm
+def plot_distribution(real_data,generated_data,discriminator=None,density=True):
+    
+    plt.hist(real_data.numpy(), 100, density=density, facecolor='g', alpha=0.75, label='real data')
+    plt.hist(generated_data.numpy(), 100, density=density, facecolor='r', alpha=0.75,label='generated data q(z) ')
+    
+    if discriminator:
+        max_=np.max([int(real_data.numpy().max()),int(generated_data.numpy().max())])
+        min_=np.min([int(real_data.numpy().min()),int(generated_data.numpy().min())])
+        x=np.linspace(min_, max_, 1000).reshape(-1,1)
+        plt.plot(x,tf.math.sigmoid(discriminator(x,training=False).numpy()),label='discriminator',color='k')
+        plt.plot(x,0.5*np.ones(x.shape),label='0.5',color='b')
+        plt.xlabel('x')
+        
+    plt.legend()
+    plt.show()
+mean = [10]
+cov = [[1]]
+X = tf.random.normal((5000,1),mean=10,stddev=1.0)
+
+print("mean:",np.mean(X))
+print("standard deviation:",np.std(X))
+Z = tf.random.normal((5000,1),mean=0,stddev=2)
+print("mean:",np.mean(Z))
+print("standard deviation:",np.std(Z))
+plot_distribution(X,Z,discriminator=None,density=True)
+Xhat=Z+10
+print("mean:",np.mean(Xhat))
+print("standard deviation:",np.std(Xhat))
+plot_distribution(X,Xhat,discriminator=None,density=True)
+def make_generator_model():
+    generator = tf.keras.Sequential()
+    generator.add(layers.Dense(1))
+    return generator
+generator=make_generator_model()
+
+Xhat = generator(Z, training=False)
+plot_distribution(real_data=X,generated_data=Xhat)
+def make_discriminator_model():
+    discriminator=tf.keras.Sequential()
+    discriminator.add(layers.Dense(1))
+    return discriminator
+
+discriminator=make_discriminator_model()
+plot_distribution(real_data=X,generated_data=Xhat,discriminator=discriminator)
+py_x=tf.math.sigmoid(discriminator(X,training=False))
+np.sum(py_x>0.5)
+py_x=discriminator(Xhat)
+np.sum(py_x>0.5)
+def get_accuracy(X,Xhat):
+    total=0
+    py_x=tf.math.sigmoid(discriminator(X,training=False))
+    total=np.mean(py_x)
+    py_x=tf.math.sigmoid(discriminator(Xhat,training=False))
+    total+=np.mean(py_x)
+    return total/2
+get_accuracy(X,Xhat)
+# This method returns a helper function to compute crossentropy loss
+cross_entropy = tf.keras.losses.BinaryCrossentropy(from_logits=True)
+def generator_loss(Xhat):
+    return cross_entropy(tf.ones_like(Xhat), Xhat)
+def discriminator_loss(X, Xhat):
+    real_loss = cross_entropy(tf.ones_like(X), X)
+    fake_loss = cross_entropy(tf.zeros_like(Xhat), Xhat)
+    total_loss = 0.5*(real_loss + fake_loss)
+    return total_loss
+generator_optimizer = tf.keras.optimizers.Adam(5e-1,beta_1=0.5,beta_2=0.8)
+
+discriminator_optimizer = tf.keras.optimizers.Adam(5e-1,beta_1=0.5, beta_2=0.8)
+
+#paramters for trainng 
+epochs=20
+BATCH_SIZE=5000
+noise_dim=1
+epsilon=100 
+
+
+#discrimator and gernerator 
+tf.random.set_seed(0)
+discriminator=make_discriminator_model()
+generator=make_generator_model()
+
+tf.config.run_functions_eagerly(True)
+
+
+
+gen_loss_epoch=[]
+disc_loss_epoch=[]
+plot_distribution(real_data=X,generated_data=Xhat,discriminator=discriminator )
+print("epoch",0)
+
+for epoch in tqdm(range(epochs)):
+    #data for the true distribution of your real data samples training ste
+    x = tf.random.normal((BATCH_SIZE,1),mean=10,stddev=1.0)
+    #random samples it was found if you increase the  stander deviation, you get better results 
+    z= tf.random.normal([BATCH_SIZE, noise_dim],mean=0,stddev=10)
+    # needed to compute the gradients for a list of variables.
+    with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape:
+        #generated sample 
+        xhat = generator(z, training=True)
+        #the output of the discriminator for real data 
+        real_output = discriminator(x, training=True)
+        #the output of the discriminator  data
+        fake_output = discriminator(xhat, training=True)
+        #loss for each 
+        gen_loss= generator_loss(fake_output)
+        disc_loss = discriminator_loss(real_output, fake_output)
+    # Compute the gradients for gen_loss and generator
+    gradients_of_generator = gen_tape.gradient(gen_loss, generator.trainable_variables)
+    # Compute the gradients for gen_loss and discriminator
+    gradients_of_discriminator = disc_tape.gradient(disc_loss, discriminator.trainable_variables)
+    # Ask the optimizer to apply the processed gradients
+    generator_optimizer.apply_gradients(zip(gradients_of_generator, generator.trainable_variables))
+    discriminator_optimizer.apply_gradients(zip(gradients_of_discriminator, discriminator.trainable_variables))
+  
+  # Save and display the generator and discriminator if the performance increases 
+    if abs(0.5-get_accuracy(x,xhat))<epsilon:
+        epsilon=abs(0.5-get_accuracy(x,xhat))
+        generator.save('generator')
+        discriminator.save('discriminator')
+        print(get_accuracy(x,xhat))
+        plot_distribution(real_data=X,generated_data=xhat,discriminator=discriminator )
+        print("epoch",epoch)
+generator=make_generator_model()
+generator= models.load_model('generator')
+xhat=generator(z)
+discriminator=models.load_model('discriminator')
+plot_distribution(real_data=X,generated_data=xhat,discriminator=discriminator )

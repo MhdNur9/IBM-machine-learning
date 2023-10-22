@@ -1,0 +1,200 @@
+import warnings
+warnings.simplefilter('ignore')
+
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' 
+
+import numpy as np
+import pandas as pd
+from itertools import accumulate
+import matplotlib.pyplot as plt
+import seaborn as sns
+%matplotlib inline
+import tensorflow as tf
+from tensorflow import keras
+from tensorflow.keras import layers
+from sklearn import metrics
+from sklearn.metrics import mean_squared_error
+
+sns.set_context('notebook')
+sns.set_style('white')
+import skillsnetwork
+await skillsnetwork.prepare("https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBMDeveloperSkillsNetwork-ML311-Coursera/labs/Module1/L2/data/Bike-Sharing-Dataset.zip",overwrite=True)
+raw_dataset = pd.read_csv('day.csv')
+raw_dataset.sample(5)
+raw_dataset = raw_dataset.drop(columns=['dteday', 'instant', 'registered', 'casual'])
+col = ['temp', 'atemp', 'hum', 'windspeed']
+plt.figure(figsize=[20,12])
+for i in enumerate(col):
+    plt.subplot(2,2,i[0]+1)
+    sns.regplot(data=raw_dataset,x=i[1],y='cnt',line_kws={"color":'red'})
+    
+plt.show()
+col = ['season', 'yr', 'mnth', 'holiday', 'weekday', 'workingday', 'weathersit']
+plt.figure(figsize=[20,12])
+for i in enumerate(col):
+    plt.subplot(2,4,i[0]+1)
+    sns.boxplot(data=raw_dataset,x=i[1],y='cnt')
+    
+plt.show()
+sns.pairplot(raw_dataset)
+plt.figure(figsize=[15,8])
+fig = sns.heatmap(raw_dataset.corr(),cmap='hot_r',
+            annot=True,linecolor='black',linewidths=0.01,annot_kws={"fontsize":12},fmt="0.2f")
+
+top, bottom = fig.get_ylim()
+fig.set_ylim(top+0.1,bottom-0.1)
+
+left, right = fig.get_xlim()
+fig.set_xlim(left-0.1,right+0.1) 
+
+plt.yticks(fontsize=13,rotation=0)
+plt.xticks(fontsize=13,rotation=90);
+train_dataset = raw_dataset.sample(frac=0.8, random_state=0)
+test_dataset = raw_dataset.drop(train_dataset.index)
+train_features = train_dataset.copy()
+test_features = test_dataset.copy()
+
+train_labels = train_features.pop('cnt')
+test_labels = test_features.pop('cnt')
+normalizer = tf.keras.layers.Normalization(axis=-1)
+normalizer.adapt(np.array(train_features))
+print(normalizer.mean.numpy())
+print(normalizer.variance.numpy())
+print(np.array(train_features[:1]))
+print(normalizer(np.array(train_features[:1])).numpy())
+temp = np.array(train_features['temp'])
+temp_normalizer = layers.Normalization(input_shape=[1,], axis=None)
+temp_normalizer.adapt(temp)
+temp_model = tf.keras.Sequential([
+    temp_normalizer,
+    layers.Dense(units=1)
+])
+temp_model.summary()
+temp_model.compile(
+    optimizer=tf.keras.optimizers.SGD(learning_rate=0.001),
+    loss='mean_squared_error')
+%%time
+history = temp_model.fit(
+    train_features['temp'],
+    train_labels,
+    # to view the logs, uncomment this:
+    verbose=False,
+    epochs=100,
+    # validation split: 20% of the training data.
+    validation_split = 0.2)
+def plot_loss(history):
+    plt.plot(history.history['loss'], label='loss')
+    plt.plot(history.history['val_loss'], label='val_loss')
+    plt.legend()
+    plt.grid(True)
+plot_loss(history)
+y_pred= temp_model.predict(test_features['temp'])
+print(np.sqrt(metrics.mean_squared_error(test_labels, y_pred)))
+plt.figure(figsize = (4,4))
+plt.plot(test_features['temp'], test_labels,'o',
+         test_features['temp'],temp_model.predict(test_features['temp']),'g')
+plt.show()
+linear_model = tf.keras.Sequential([
+    normalizer,
+    layers.Dense(units=1)
+])
+linear_model.compile(
+    optimizer=tf.keras.optimizers.SGD(learning_rate=0.001),
+    loss='mean_squared_error')
+%%time
+history = linear_model.fit(
+    train_features,
+    train_labels,
+    epochs=100,
+    # to view the logs, uncomment this:
+    verbose=0,
+    # validation split: 20% of the training data.
+    validation_split = 0.2)
+plot_loss(history)
+y_pred= linear_model.predict(test_features)
+print(np.sqrt(metrics.mean_squared_error(test_labels, y_pred)))
+# Print column names for reference
+print("Column names")
+print(test_features.columns)
+
+# Print weights and biases for each layer
+for layer in linear_model.layers:
+    print("Layer Name:", layer.name)
+    print("---")
+    print("Weights")
+    print("Shape:",layer.get_weights()[0].shape,'\n',layer.get_weights()[0])
+    print("---")
+    print("Bias")
+    print("Shape:",layer.get_weights()[1].shape,'\n',layer.get_weights()[1],'\n')
+
+df = pd.read_csv('https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBMDeveloperSkillsNetwork-ML311-Coursera/labs/Module1/L2/data/IowaHousingPrices.csv')
+
+x_train = df[['SquareFeet']].values[1:-500]
+y_train = df[['SalePrice']].values[1:-500]
+x_test = df[['SquareFeet']].values[-500:]
+y_test = df[['SalePrice']].values[-500:]
+output_size=1
+hidden_layer=500
+input_size=1
+learning_rate=0.51
+loss_function='mean_squared_error'
+epochs=30
+batch_size=10
+model = keras.Sequential()
+model.add(keras.layers.Dense(hidden_layer,  activation='relu'))
+
+model.add(keras.layers.Dense(output_size))
+model.compile(keras.optimizers.Adam(lr=learning_rate), loss_function)
+model.fit(x_train, y_train, epochs = epochs, batch_size = batch_size)
+x=np.arange(x_test.min(),x_test.max(),10).reshape(-1,1)
+y_pred = model.predict(x)
+plt.plot(x,y_pred,label="prediction ")
+plt.plot(x_test,y_test,'ro',label="test samples")
+plt.xlabel('Input')
+plt.ylabel('Predicted Output')
+plt.legend()
+plt.show()
+url = 'https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBMDeveloperSkillsNetwork-ML311-Coursera/labs/Module1/L2/data/auto-mpg.data'
+column_names = ['MPG', 'Cylinders', 'Displacement', 'Horsepower', 'Weight',
+                'Acceleration', 'Model Year', 'Origin']
+
+
+raw_dataset = pd.read_csv(url, names=column_names,
+                          na_values='?', comment='\t',
+                          sep=' ', skipinitialspace=True)
+dataset = raw_dataset.dropna()
+dataset = dataset.drop(columns=['Origin'])
+train_dataset = dataset.sample(frac=0.8, random_state=0)
+test_dataset = dataset.drop(train_dataset.index)
+
+train_features = train_dataset.copy()
+test_features = test_dataset.copy()
+
+train_labels = train_features.pop('MPG')
+test_labels = test_features.pop('MPG')
+normalizer = tf.keras.layers.Normalization(axis=-1)
+normalizer.adapt(np.array(train_features))
+print(normalizer.mean.numpy())
+print(normalizer.variance.numpy())
+linear_model = tf.keras.Sequential([
+    normalizer,
+    layers.Dense(units=1)
+])
+linear_model.compile(
+    optimizer=tf.keras.optimizers.SGD(learning_rate=0.001),
+    loss='mean_squared_error')
+
+history = linear_model.fit(
+    train_features,
+    train_labels,
+    epochs=100,
+    # to view the logs, uncomment this:
+    verbose=0,
+    # validation split: 20% of the training data.
+    validation_split = 0.2)
+
+plot_loss(history)
+y_pred= linear_model.predict(test_features)
+print(np.sqrt(metrics.mean_squared_error(test_labels, y_pred)))
+

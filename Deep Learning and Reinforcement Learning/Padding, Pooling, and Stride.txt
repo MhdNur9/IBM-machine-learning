@@ -1,0 +1,286 @@
+import warnings
+warnings.filterwarnings('ignore')
+
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' 
+
+import numpy as np
+import pandas as pd
+from itertools import accumulate
+import matplotlib.pyplot as plt
+import seaborn as sns
+%matplotlib inline
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LogisticRegression
+from sklearn.datasets import load_digits, load_wine
+
+import pathlib
+import numpy as np
+import matplotlib.pyplot as plt
+%matplotlib inline
+
+import PIL
+from PIL import Image, ImageOps
+import tensorflow as tf
+
+from tensorflow import keras
+from tensorflow.keras import layers, datasets
+from tensorflow.keras.layers import MaxPooling2D
+from tensorflow.keras.layers import AveragePooling2D
+
+sns.set_context('notebook')
+sns.set_style('white')
+# This function will allow us to easily plot data taking in x values, y values, and a title
+def sobel(img, strides, padding, activation=None):
+    
+    input_layer = layers.Input(shape=(img_height, img_width, 1))
+
+    v_conv = layers.Conv2D(filters=1,
+                       kernel_size=3,
+                       kernel_initializer=v_grad,
+                       strides=strides,
+                       padding=padding,
+                       activation=None)
+    h_conv = layers.Conv2D(filters=1, 
+                   kernel_size=3,
+                   kernel_initializer=h_grad,
+                   strides=strides,
+                   padding=padding,
+                   activation=None)
+    
+    v_model = keras.Sequential([input_layer, v_conv])
+    h_model = keras.Sequential([input_layer, h_conv])    
+    
+    out_d = h_model.layers[0].output_shape[1:]
+    Gx = h_model.predict(img).reshape(out_d)
+    Gy = v_model.predict(img).reshape(out_d)
+    G = np.sqrt(np.add(np.multiply(Gx, Gx), np.multiply(Gy, Gy)))
+    
+    return G
+from keras.models import Sequential
+from keras.layers import Conv2D
+
+model = Sequential()
+model.add(Conv2D(filters = 1,
+                 kernel_size = (3,3),
+                 padding = 'same',
+                 input_shape = (10, 10, 1)))
+model.summary()
+model = Sequential()
+model.add(Conv2D(filters = 1,
+                 kernel_size = (3, 3),
+                 strides = (2, 2),
+                 padding = "same",
+                 input_shape = (3, 3, 1)))
+model.summary()
+input_ = np.array([[1, 1, 3],
+              [2, 1, 2],
+              [3, 1, 4]]).reshape(1, 3, 3, 1)
+
+kernel = np.array([[1, 0, -1],
+                   [1, 0, -1],
+                   [1, 0, -1]]).reshape(3, 3, 1, 1) # reshaping the kernel is important
+
+b = np.array([0.0])
+
+model.set_weights([kernel, b])
+output_ = model.predict(input_)
+
+for r in range(output_.shape[1]):
+    print([output_[0,r,c,0] for c in range(output_.shape[2])])
+# Lets define our custom kernels for the horizontal and vertical gradients
+def v_grad(shape, dtype=None):
+    # Here we use a single numpy array to define our x gradient kernel
+    grad = np.array([
+        [1, 0, -1],
+        [2, 0, -2],
+        [1, 0, -1]
+    ]).reshape((3, 3, 1, 1))
+    # this line is quite important, we are saying we want one 3x3 kernel each for one channel of pixels (grayscale)
+    
+    # We check to make sure the shape of our kernel is the correct shape
+    # according to the initialization of the Convolutional layer below
+    assert grad.shape == shape
+    return keras.backend.variable(grad, dtype='float32')
+
+def h_grad(shape, dtype=None):
+    grad = np.array([
+        [1, 2, 1],
+        [0, 0, 0],
+        [-1, -2, -1]
+        ]).reshape((3, 3, 1, 1))
+    
+    assert grad.shape == shape
+    return keras.backend.variable(grad, dtype='float32')
+!wget "https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBMDeveloperSkillsNetwork-ML311-Coursera/images/pisa.jpg"
+img_width = 350
+img_height = 500
+img = PIL.Image.open("pisa.jpg").resize((img_width, img_height))
+img
+input_img = ImageOps.grayscale(img)
+input_img = np.array(input_img).reshape((1, img_height, img_width, 1))
+
+fig, axs = plt.subplots(1, 3, figsize=(9, 10), constrained_layout=True)
+fig.set_constrained_layout_pads(w_pad=0.01, h_pad=0.02, hspace=0, wspace=0.1)
+
+for i, ax in enumerate(axs.flat):
+    output = sobel(img = input_img, 
+                   padding='same',
+                   strides=i+1).astype('int').clip(0,255)
+
+    ax.imshow(output, cmap='gray')
+    ax.set_title(f"Strides: {i+1}, Shape: {output.shape}", fontsize=13)
+    ax.axis('off')
+def sigmoid(X):
+
+    return 1/(1 + np.exp(-X))
+
+X = np.linspace(-10, 10, 100)
+sigmoid_X = sigmoid(X)
+plt.plot(X, sigmoid_X)
+plt.axhline(y=0.5, color='r', linestyle='-')
+plt.xlabel("x")
+plt.ylabel("Sigmoid(x)")
+def relu(X):
+    return np.maximum(0, X)
+
+X = np.linspace(-10, 10, 100)
+relu_X = relu(X)
+plt.plot(X, relu_X)
+plt.xlabel("x")
+plt.ylabel("Relu(x)")
+!wget "https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBMDeveloperSkillsNetwork-ML311-Coursera/images/lambor.jpeg"
+img_width = 500
+img_height = 280
+
+img = Image.open("lambor.jpeg").resize((img_width, img_height))
+img
+arr = np.array(img)
+red_c = arr[:,:,0]
+green_c = arr[:,:,1]
+blue_c = arr[:,:,2]
+
+channels = [red_c, green_c, blue_c]
+names = ["Red", "Green", "Blue"]
+
+plt.figure(figsize=(18, 5))
+
+for i in range(3):
+    plt.subplot(1,3,i+1)
+    plt.imshow(channels[i], cmap='gray')
+    plt.axis("off")
+    plt.title(f"{names[i]} channel", fontsize=13)
+kernel = np.array([[-1,-1,-1],
+                   [-1,8,-1],
+                   [-1,-1,-1]]).reshape(3,3,1,1)
+b = np.array([0.0])
+
+model = keras.Sequential()
+model.add(layers.Conv2D(input_shape = (img_height, img_width, 1),
+                 filters=1, 
+                 kernel_size=3, 
+                 padding='same',
+                 activation='relu'
+                 ))
+model.set_weights([kernel, b])
+model.summary()
+acts = []
+plt.figure(figsize=(18,5))
+
+for i in range(3):
+    plt.subplot(1,3,i+1)
+    
+    # loop through each channel
+    input_ = channels[i].reshape((1, img_height, img_width, 1)) 
+    act = model.predict(input_).squeeze(0).squeeze(2).astype('int').clip(0,255)
+    # store the result in a list called "acts"
+    acts.append(act)
+    
+    plt.imshow(act, cmap='gray')
+    plt.axis("off")
+    plt.title(f"{names[i]} Channel with activation", fontsize=13)
+arr_hat = np.dstack((acts[0],acts[1],acts[2]))
+
+plt.figure(figsize=(10,5))
+plt.imshow(arr_hat)
+plt.axis("off")
+(X_train, y_train), (X_test, y_test) = keras.datasets.mnist.load_data()
+print("MNIST downloaded!")
+print("Train set shape:", X_train.shape)
+images = []
+plt.figure(figsize=(15,3))
+for i in range(5):
+    img = X_train[np.random.randint(0, 60000)].astype('float')
+    images.append(img)
+    
+    plt.subplot(1,5,i+1)
+    plt.imshow(img)
+    plt.axis('off')    
+max_pool = keras.Sequential([MaxPooling2D(pool_size = (2,2))])
+avg_pool = keras.Sequential([AveragePooling2D(pool_size = (2,2))])
+
+fig1, axs1 = plt.subplots(1, 5, figsize=(12,3), constrained_layout=True)
+fig2, axs2 = plt.subplots(1, 5, figsize=(12,3), constrained_layout=True)
+fig1.suptitle("Max pooling result", fontsize=20)
+fig2.suptitle("Average pooling result", fontsize=20)
+
+for img, ax1, ax2 in zip(images, axs1.flat, axs2.flat):
+    input_ = img.reshape(1, 28, 28, 1)
+    ax1.imshow(max_pool.predict(input_).squeeze(0).squeeze(2))
+    ax1.axis('off')
+    ax2.imshow(avg_pool.predict(input_).squeeze(0).squeeze(2))
+    ax2.axis('off')
+from keras.utils import to_categorical
+from keras.layers import Flatten, Dense, Conv2D, MaxPooling2D
+from keras.models import Sequential
+
+def load_cifar10():
+    (trainX, trainY), (testX, testY) = datasets.cifar10.load_data()
+    
+    trainX = trainX.astype('float32') / 255
+    testX = testX.astype('float32') / 255
+    
+    trainY = to_categorical(trainY)
+    testY = to_categorical(testY)
+    
+    return trainX, trainY, testX, testY
+X_train, y_train, X_test, y_test = load_cifar10()
+
+X_train.shape, y_train.shape, X_test.shape, y_test.shape
+class_names = ['airplane', 'automobile', 'bird', 'cat', 'deer',
+               'dog', 'frog', 'horse', 'ship', 'truck']
+plt.figure(figsize=(10,10))
+for i in range(25):
+    plt.subplot(5, 5, i+1)
+    plt.imshow(X_train[i])
+    plt.title(class_names[np.where(y_train[i]==1)[0][0]])
+    plt.axis("off")
+Conv = layers.Conv2D(filters=32,
+                     kernel_size=(3,3),
+                     kernel_initializer='he_uniform',
+                     padding='same',
+                     activation='relu')
+Max = layers.MaxPooling2D(pool_size=(2,2))
+model = Sequential()
+model.add(Conv2D(32, (3, 3), activation='relu', kernel_initializer='he_uniform', padding='same', 
+                 input_shape=(32, 32, 3))) 
+# Don't forget specifying input_shape in the 1st Conv2D layer of your CNN
+
+model.add(Conv2D(32, (3, 3), activation='relu', kernel_initializer='he_uniform', padding='same'))
+model.add(MaxPooling2D((2, 2)))
+
+model.add(Conv2D(64, (3, 3), activation='relu', kernel_initializer='he_uniform', padding='same'))
+model.add(Conv2D(64, (3, 3), activation='relu', kernel_initializer='he_uniform', padding='same'))
+model.add(MaxPooling2D((2, 2)))
+
+model.add(Conv2D(128, (3, 3), activation='relu', kernel_initializer='he_uniform', padding='same'))
+model.add(Conv2D(128, (3, 3), activation='relu', kernel_initializer='he_uniform', padding='same'))
+model.add(MaxPooling2D((2, 2)))
+model.add(Flatten())
+model.add(Dense(128, activation='relu', kernel_initializer='he_uniform'))
+model.add(Dense(10, activation='softmax'))
+model.summary()
+# compile model
+model.compile(optimizer='adam', 
+              loss='categorical_crossentropy',
+              metrics=['accuracy'])
