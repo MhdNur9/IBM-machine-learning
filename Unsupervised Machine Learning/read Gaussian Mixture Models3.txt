@@ -1,0 +1,17 @@
+import numpy as np
+import cv2
+from sklearn.mixture import GaussianMixture as GMM
+
+img = cv2.imread('cat.jpeg')
+# If img is greyscale, then change to .reshape(-1, 1):
+x = img.reshape(-1, 3)
+# The number of components; you can change this to a positive integer of your choice!:
+n = 8
+gmm = GMM(n_components=n, covariance_type='tied')
+gmm.fit(x)
+labels = gmm.predict(x)
+seg = np.zeros(x.shape)
+for label in range(n):
+    seg[labels == label] = gmm.means_[label]
+seg = seg.reshape(img.shape).astype(np.uint8)
+cv2.imwrite(f'gauss-cat-{n}.jpeg', seg)

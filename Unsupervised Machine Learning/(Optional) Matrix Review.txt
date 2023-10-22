@@ -1,0 +1,170 @@
+# Surpress warnings from using older version of sklearn:
+def warn(*args, **kwargs):
+    pass
+import warnings
+warnings.warn = warn
+
+import numpy as np 
+import matplotlib.pylab as plt
+
+from sklearn.decomposition import PCA
+from sympy import Matrix, init_printing,Symbol
+from numpy.linalg import qr,eig,inv,matrix_rank,inv, norm
+from scipy.linalg import null_space
+init_printing()
+def plot_2d(dict_):
+    for key, value in dict_.items():
+        if value.shape[0]>2:
+            plt.scatter(value[:, 0], value[:, 1],label=key)
+        else:
+            print(value)
+            plt.quiver([0],[0],value[:,0],value[:,1],label=key)
+
+    plt.legend()
+    plt.show()
+A=np.array([[2,-3],[4,7]])
+
+Matrix(A)
+a1=A[:,0]
+a1
+a2=A[:,1]
+a2
+AT=A.T
+Matrix(AT)
+matrix_rank(A)
+fig, ax = plt.subplots(figsize = (12, 7))
+
+ax.quiver([0, 0],[0, 0],A[0,0], A[1,0],scale=30,label="$a_{1}$")
+ax.quiver([0, 0],[0, 0],A[0,1], A[1,1],scale=30,label="$a_{2}$")
+plt.title("columns of $A$ ")
+plt.legend()
+plt.show()
+F=np.array([[2,4],[4,8]])
+matrix_rank(F)
+fig, ax = plt.subplots(figsize = (12, 7))
+ax.quiver([0, 0],[0, 0],F[0,1], F[1,1],scale=30,label="$f_{2}$",color='red')
+ax.quiver([0, 0],[0, 0],F[0,0], F[1,0],scale=30,label="$f_{1}$")
+plt.title("columns of $F$ ")
+plt.legend()
+plt.show()
+F=np.array([[1,2],[1,-2],[-1,1]])
+Matrix(F)
+ax = plt.figure().add_subplot(projection='3d')
+p=null_space(F.T)
+xx, yy = np.meshgrid(np.arange(-3,3,0.1), np.arange(-3,3,0.1))
+z=(p[0]*xx+p[1]*yy)/p[2]
+ax.plot_surface(xx, yy, z, alpha=0.1)
+ax.quiver([0,0], [0,0], [0,0], F[0,:], F[1,:], F[2,:])
+
+ax.set_xlim([-3, 3])
+ax.set_ylim([-3, 3])
+ax.set_zlim([-3, 3])
+plt.show()
+matrix_rank(F)
+Matrix(A), norm(A)
+m, n = A.shape[0], A.shape[1] # get number of rows and columns 
+ss = 0
+
+for i in range(m):
+    for j in range(n):
+        ss += A[i,j] ** 2
+np.sqrt(ss)
+B=np.array([[1,1],[1,-1]])
+Matrix(B)
+C=A+B
+Matrix(C)
+B_T=B.T
+Matrix(B_T)
+C=np.random.randn(2,2)
+S=C+C.T
+Matrix(S)
+Matrix(S.T)
+Matrix(np.diag(np.array([1,2,3])))
+Matrix(np.eye(3))
+a=np.array([1,1])
+b=np.array([1,2])
+a.ndim
+a@b
+a=np.array([[1],[1]])
+b=np.array([[1],[2]])
+a.T@b
+a.T@one
+u= np.array([[1],[2],[3],[4]])
+v= np.array([[0],[1],[2],[3],[6]])
+
+Matrix(u@v.T)
+u=np.array([[1],[2]])
+Matrix(u@np.array([[0,1,0,1]]))
+x=np.array([1,1])
+A=np.array([[-1,1],[1,2]])
+b=A@x
+Matrix(b)
+fig, ax = plt.subplots(figsize = (12, 7))
+ax.quiver([0, 0],[0, 0],A[0,0], A[1,0],scale=10,label="$a_{1}$")
+ax.quiver([0, 0],[0, 0],A[0,1], A[1,1],scale=10,label="$a_{2}$")
+ax.quiver([0,0],[0,0],b[0], b[1],scale=10,label="b",color='r')
+ax.quiver([0,0],[0,0],x[0], x[1],scale=10,label="x",color='b')
+ax.set_xlim([-10,10])
+ax.set_ylim([-5,10])
+fig.legend()
+plt.show()
+C=A@B
+Matrix(C)
+A_inv=inv(A)
+Matrix(A_inv)
+I=A_inv@A
+Matrix(I)
+A@I
+x_=A_inv@b
+print("x_ :",x_)
+print("x:",x)
+Q=np.array([[1,1],[1,-1]])*2**(-1/2)
+Q
+I=Q@Q.T
+Matrix(I)
+fig, ax = plt.subplots(figsize = (12, 7))
+ax.quiver([0, 0],[0, 0],B[0,0], B[1,0],scale=10,label="$q_{1}$")
+ax.quiver([0, 0],[0, 0],B[0,1], B[1,1],scale=10,label="$q_{2}$")
+plt.title("columns of $B$ ")
+plt.legend()
+plt.show()
+samples=200
+
+u=np.array([[1.0,1.0],[0.10,-0.10]])/(2)**(0.5)
+
+X_=np.dot(4*np.random.randn(samples,2),u)+10
+X_[0:5]
+dict_={"design matrix samples":X_}
+plot_2d(dict_)
+N,D=X_.shape
+print("number of smaples {}, dimensions is {}".format(N,D))
+mean=(np.ones((1,N))/N)@X_
+mean
+X_.mean(axis=0)
+I=np.identity(N)
+col1=np.ones((1,N))
+row1=np.ones((N,1))/N
+no_mean=(I-row1@col1)
+X=no_mean@X_
+print("mean of X",X.mean(axis=0))
+
+dict_={"original data":X_,"zero mean data":X,"mean":mean}
+plot_2d(dict_)   
+C=X.T@X/N
+Matrix(C)
+matrix_rank(C)
+eigen_values , eigen_vectors = eig(A)
+Matrix(np.diag(eigen_values))
+A=eigen_vectors@np.diag(eigen_values)@inv(eigen_vectors)
+Matrix(A)
+eigen_values , eigen_vectors = eig(C)
+v=eigen_vectors[:, np.argmax(eigen_values)].reshape(-1,1)
+v
+Z=X@v
+pca = PCA(n_components=1)
+X_transformed=pca.fit_transform(X)
+X_=pca.inverse_transform(X_transformed)
+
+Xhat=Z@v.T
+dict_ = {"Sklearn inverse_transform": X_, "Matrix inverse transform": Xhat, "First Principal Component": v.T}
+plot_2d(dict_)

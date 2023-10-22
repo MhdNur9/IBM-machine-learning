@@ -1,0 +1,213 @@
+# Surpress warnings from using older version of sklearn:
+def warn(*args, **kwargs):
+    pass
+import warnings
+warnings.warn = warn
+
+from tqdm import tqdm
+import numpy as np
+import pandas as pd
+from itertools import accumulate
+
+import matplotlib.pyplot as plt
+import seaborn as sns
+%matplotlib inline
+
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
+from sklearn.model_selection import train_test_split
+from sklearn.model_selection import RandomizedSearchCV
+from sklearn.datasets import fetch_lfw_people
+from sklearn.metrics import classification_report
+from sklearn.metrics import confusion_matrix
+from sklearn.svm import SVC
+from scipy.stats import loguniform
+
+warnings.filterwarnings('ignore')
+
+sns.set_context('notebook')
+sns.set_style('white')
+def plot_explained_variance(pca):
+    # This function graphs the accumulated explained variance ratio for a fitted PCA object.
+    acc = [*accumulate(pca.explained_variance_ratio_)]
+    fig, ax = plt.subplots(1, figsize=(50, 20))
+    ax.stackplot(range(pca.n_components_), acc)
+    ax.scatter(range(pca.n_components_), acc, color='black')
+    ax.set_ylim(0, 1)
+    ax.set_xlim(0, pca.n_components_-1)
+    ax.tick_params(axis='both', labelsize=36)
+    ax.set_xlabel('N Components', fontsize=48)
+    ax.set_ylabel('Accumulated explained variance', fontsize=48)
+    plt.tight_layout()
+    plt.show()
+hwdf = pd.read_csv('https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBM-ML0187EN-SkillsNetwork/labs/module%203/data/HeightsWeights.csv', index_col=0)
+hwdf.head()
+scaler = StandardScaler()
+hwdf[:] = scaler.fit_transform(hwdf)
+hwdf.columns = [f'{c} (scaled)' for c in hwdf.columns]
+hwdf.head()
+fig = plt.figure()
+ax1 = fig.add_subplot(121, projection='3d')
+xs, ys, zs = [hwdf[attr] for attr in hwdf.columns]
+ax1.scatter(xs, ys, zs)
+
+ax2 = fig.add_subplot(122, projection='3d')
+xs, ys, zs = [hwdf[attr] for attr in hwdf.columns]
+ax2.view_init(elev=10, azim=-10)
+ax2.scatter(xs, ys, zs)
+
+plt.tight_layout()
+plt.show()
+sns.pairplot(hwdf)
+plt.show()
+hwdf.corr().style.background_gradient(cmap='coolwarm')
+pca = PCA()
+pca.fit(hwdf)
+Xhat = pca.transform(hwdf)
+Xhat.shape
+hwdf_PCA = pd.DataFrame(columns=[f'Projection on Component {i+1}' for i in range(len(hwdf.columns))], data=Xhat)
+hwdf_PCA.head()
+colors = ['red', 'red', 'green']
+
+fig = plt.figure(figsize=(12,8))
+ax1 = fig.add_subplot(121, projection='3d')
+xs, ys, zs = [hwdf[attr] for attr in hwdf.columns]
+ax1.view_init(elev=10, azim=75)
+ax1.scatter(xs, ys, zs)
+
+for component, color in zip(pca.components_, colors):
+    ax1.quiver(*[0, 0, 0], *(8 * component), color=color)
+
+    
+ax2 = fig.add_subplot(122, projection='3d')
+xs, ys, zs = [hwdf[attr] for attr in hwdf.columns]
+ax2.view_init(elev=0, azim=0)
+ax2.scatter(xs, ys, zs)
+
+for component, color in zip(pca.components_, colors):
+    ax2.quiver(*[0, 0, 0], *(8 * component), color=color)
+
+plt.show()
+
+for color, ev in zip(colors, pca.explained_variance_ratio_):
+    print(f'{color} component accounts for {ev * 100:.2f}% of explained variance')
+sns.pairplot(hwdf_PCA)
+plt.show()
+hwdf_PCA.corr().style.background_gradient(cmap='coolwarm')
+hwdf_PCA.drop('Projection on Component 3', axis=1, inplace=True)
+hwdf_PCA.head()
+scaler = StandardScaler()
+X = pd.DataFrame(scaler.fit_transform(hwdf), index=hwdf.index, columns=hwdf.columns)
+X.head()
+
+pca = PCA()
+X_PCA = pd.DataFrame(pca.fit_transform(X), index=X.index, columns=[f'Component {i}' for i in range(pca.n_components_)])
+# (Remember it's technically "Projection onto Component {i}")
+X_PCA.head()
+plot_explained_variance(pca)
+threshold = 0.99
+num = next(i for i, x in enumerate(accumulate(pca.explained_variance_ratio_), 1) if x >= threshold)
+print(f'We can keep the first {num} components and discard the other {pca.n_components_-num},')
+print(f'keeping >={100 * threshold}% of the explained variance!')
+X_PCA.drop([f'Component {i}' for i in range(num, pca.n_components_)], axis=1, inplace=True)
+X_PCA.head()
+lfw_people = fetch_lfw_people(min_faces_per_person=70, resize=0.4)
+# introspect the images arrays to find the shapes (for plotting)
+N, h, w = lfw_people.images.shape
+target_names = lfw_people.target_names
+y = lfw_people.target
+X = lfw_people.data
+n_features = X.shape[1]
+for person in np.unique(lfw_people.target):
+    idx = np.argmax(lfw_people.target == person)
+    plt.imshow(lfw_people.images[idx], cmap='gray')
+    plt.title(lfw_people.target_names[person])
+    plt.show()
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.25, random_state=42
+)
+param_grid = {
+    "C": loguniform(1e3, 1e5),
+    "gamma": loguniform(1e-4, 1e-1)
+}
+clf = RandomizedSearchCV(
+    SVC(kernel="rbf", class_weight="balanced"), param_grid, n_iter=10
+)
+clf = clf.fit(X_train, y_train)
+y_pred = clf.predict(X_test)
+hmap = sns.heatmap(
+    confusion_matrix(y_test, y_pred),
+    annot=True,
+    xticklabels=lfw_people.target_names,
+    yticklabels=lfw_people.target_names,
+    fmt='g'
+)
+hmap.set_xlabel('Predicted Value')
+hmap.set_ylabel('Truth Value')
+pca = PCA(svd_solver='full',  whiten=True).fit(X_train)
+person_index=1
+Xhat=pca.transform(X[person_index,:].reshape(1, -1))
+plt.imshow(pca.inverse_transform(Xhat).reshape(h, w), cmap='gray')
+plt.title("Image after PCA and inverse transform"  ) 
+plt.show()
+plt.imshow(lfw_people.images[person_index],cmap='gray')
+plt.title("Image")
+plt.show()
+plot_explained_variance(pca)
+plt.show()
+threshold = 0.60
+components = np.cumsum(pca.explained_variance_ratio_) < threshold
+components.sum()
+for component in pca.components_[components,:]:
+    plt.imshow(component.reshape(h, w),cmap='gray')
+    plt.show()
+pca = PCA(n_components=150, svd_solver="randomized", whiten=True).fit(X_train)
+X_train_pca = pca.transform(X_train)
+X_test_pca = pca.transform(X_test)
+person_index = 1
+plt.figure(figsize=(8, 4))
+plt.subplot(1,2,1)
+plt.imshow(lfw_people.images[person_index,:,:],cmap='gray')
+plt.title("Original image")
+
+plt.subplot(1,2,2)
+plt.imshow(pca.inverse_transform(pca.transform(X[person_index ,:].reshape(1, -1))).reshape(h, w),cmap='gray')
+plt.title("PCA transformed and inverse-transformed image ") 
+
+plt.tight_layout()
+plt.show()
+param_grid = {
+    "C": loguniform(1e3, 1e5),
+    "gamma": loguniform(1e-4, 1e-1),
+}
+clf = RandomizedSearchCV(
+    SVC(kernel="rbf", class_weight="balanced"), param_grid, n_iter=10
+)
+
+clf = clf.fit(X_train_pca, y_train)
+y_pred = clf.predict(X_test_pca)
+hmap = sns.heatmap(
+    confusion_matrix(y_test, y_pred),
+    annot=True,
+    xticklabels=lfw_people.target_names,
+    yticklabels=lfw_people.target_names,
+    fmt='g'
+)
+hmap.set_xlabel('Predicted Value')
+hmap.set_ylabel('Truth Value')
+df = pd.read_csv('https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBM-ML0187EN-SkillsNetwork/labs/module%203/data/energydata_complete.csv')
+df.drop('date', axis=1, inplace=True)
+df = df.dropna().astype(np.float64)
+df.head()
+scaler = StandardScaler()
+df[:] = scaler.fit_transform(df)
+df.head()
+
+pca = PCA()
+pca.fit(df)
+np.argwhere(pca.explained_variance_ratio_.cumsum() >= 0.95)[0][0] + 1
+
+pca = PCA(n_components=12)
+reduced_data = pca.fit(df).transform(df)
+
+pd.DataFrame(reduced_data, columns=[f'Component {i}' for i in range(reduced_data.shape[1])]).head()

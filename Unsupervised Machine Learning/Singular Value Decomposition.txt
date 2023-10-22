@@ -1,0 +1,178 @@
+import skillsnetwork
+
+await skillsnetwork.prepare("https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBM-ML0187EN-SkillsNetwork/labs/module%203/data/traffic.tar.gz")
+await skillsnetwork.prepare("https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBM-ML0187EN-SkillsNetwork/labs/module%203/data/peds.tar.gz")
+await skillsnetwork.prepare("https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBM-ML0187EN-SkillsNetwork/labs/module%203/data/boats.tar.gz")
+
+# Surpress warnings:
+def warn(*args, **kwargs):
+    pass
+import warnings
+warnings.warn = warn
+import pandas as pd
+import numpy as np 
+
+
+from os import listdir,getcwd
+from os.path import isfile, join
+from random import randint
+from PIL import Image
+
+import seaborn as sns 
+import matplotlib.pylab as plt
+%matplotlib inline
+
+from sklearn.decomposition import PCA
+from sklearn.decomposition import TruncatedSVD
+
+
+from sympy import Matrix, init_printing,Symbol
+from numpy.linalg import qr,eig,inv,matrix_rank,inv,svd
+init_printing()
+def get_data_Matrix (mypath="peds"):
+    cwd = getcwd()
+
+    mypath=join(cwd,mypath)
+    files = [ join(mypath,f) for f in listdir(mypath) if isfile(join(mypath, f)) and f.startswith(".")==False]
+    # Read image
+    img = Image.open(files[0])
+    I=np.array(img)
+    # Output Images
+
+    Length,Width=I.shape
+   
+    X=np.zeros((len(files),Length*Width))
+    for i,file in enumerate(files):
+        img = Image.open(file)
+        I=np.array(img)
+        X[i,:]=I.reshape(1,-1)
+    return X,Length,Width
+X=np.array([[1.0,2],[2,1],[3,3]])
+Matrix(X)
+U, s, VT =svd(X, full_matrices=False)
+Matrix(U)
+S=np.diag(s)
+
+Matrix(S)
+Matrix(VT)
+X_=U@S@VT
+X_=np.round(X_)
+Matrix(X_)
+X_2=s[0]*U[:,0:1]@VT[0:1,:]+s[1]*U[:,1:2]@VT[1:2,:]
+Matrix(X_2)
+X=np.array([[1,2],[2,4],[4,8.0001]])
+Matrix(X)
+U, s, VT =svd(X, full_matrices=False)
+S=np.diag(s)
+Matrix(S)
+X_hat=np.round(s[0]*U[:,0:1]@VT[0:1,:])
+Matrix(X_hat)
+L=1
+Xhat=U[:,:L]@S[0:L,0:L]@VT[:L,:]
+Matrix(Xhat)
+print(f"With {L} singular value and its corresponding singular vectors, {s[0:L]/s.sum()} variance of X is explained")
+plt.figure()
+plt.plot(np.cumsum(s)/s.sum())
+plt.xlabel('L')
+plt.title('Cumulative explained singular value')
+plt.tight_layout()
+plt.show()
+svd_ = TruncatedSVD(n_components=1, random_state=42)
+Z=svd_.fit_transform(X)
+Z
+Xhat=svd_.inverse_transform(Z)
+Matrix(np.round(Xhat))
+X,Length,Width=get_data_Matrix(mypath="peds")
+X.shape, Length, Width
+for i in range(5):
+    frame=randint(0, X.shape[0]-1)
+    plt.imshow(X[randint(0, X.shape[0]-1),:].reshape(Length,Width),cmap="gray")
+    plt.title("frame: "+str(frame))
+    plt.show()
+U, s, VT =svd(X, full_matrices=False)
+S=np.diag(s)
+L=1
+Xhat=U[:,:L]@S[0:L,0:L]@VT[:L,:]
+plt.imshow(Xhat[0,:].reshape(Length,Width),cmap="gray")
+plt.title('Truncated SVD L=1')
+plt.show()
+for i in range(5):
+    frame=randint(0, X.shape[0]-1)
+    plt.imshow(Xhat[randint(0, X.shape[0]-1),:].reshape(Length,Width),cmap="gray")
+    plt.title("frame: "+str(frame))
+    plt.show()
+plt.plot(np.cumsum(s)/s.sum())
+plt.xlabel('L')
+plt.title('Cumulative explained  singular value')
+plt.show()
+
+L=10
+Xhat=U[:,:L]@S[0:L,0:L]@VT[:L,:]
+for i in range(5):
+    frame=randint(0, X.shape[0]-1)
+    plt.imshow(Xhat[randint(0, X.shape[0]-1),:].reshape(Length,Width),cmap="gray")
+    plt.title("frame: "+str(frame))
+    plt.show()
+X,Length,Width=get_data_Matrix (mypath="boats")
+
+for i in range(5):
+    frame=randint(0, X.shape[0]-1)
+    plt.imshow(X[randint(0, X.shape[0]-1),:].reshape(Length,Width),cmap="gray")
+    plt.title("frame: "+str(frame))
+    plt.show()
+    
+U, s, VT =svd(X, full_matrices=False)
+L=1
+Xhat=U[:,:L]@S[0:L,0:L]@VT[:L,:]
+
+plt.imshow(Xhat[0,:].reshape(Length,Width),cmap="gray")
+plt.title('Truncated SVD L=1')
+
+plt.show()
+X,Length,Width=get_data_Matrix (mypath="traffic")
+
+for i in range(5):
+    frame=randint(0, X.shape[0]-1)
+    plt.imshow(X[randint(0, X.shape[0]-1),:].reshape(Length,Width),cmap="gray")
+    plt.title("frame: "+str(frame))
+    plt.show()
+    
+svd_ = TruncatedSVD(n_components=1, n_iter=7, random_state=42)
+score=svd_.fit_transform(X)
+Xhat=svd_.inverse_transform(score)
+plt.imshow(Xhat[0,:].reshape(Length,Width),cmap="gray")
+plt.imshow(Xhat[0,:].reshape(Length,Width),cmap="gray")
+plt.title('Truncated SVD L=1')
+
+plt.show()
+plt.show()
+
+X=np.array([[1,2],[2,4],[4,8]])
+Matrix(X)
+C=X.T@X
+eigen_vectors1 , V=eig(C)
+Matrix(V)
+G=X@X.T
+eigen_vectors2 , U=eig(G)
+Matrix(U)
+S=np.round((U.T@X@V))
+Matrix(S)
+X_=np.round(U@S@V.T)
+Matrix(X_)
+N=200
+u=np.array([[1.0,1.0],[0.10,-0.10]])/(2)**(0.5)
+X_=np.dot(4*np.random.randn(N,2),u)+10
+X=X_-X_.mean(axis=0)
+U, s, VT =svd(X, full_matrices=False)
+pca = PCA(n_components=1)
+projection=pca.fit_transform(X)
+X_sklearn=pca.inverse_transform(projection)
+projection_=X@VT[0,:]
+print ("error SVD vs scikit-learn's PCA",(projection_-projection).sum()) 
+projection_=U@np.diag(s)[:,0]
+print ("error SVD vs scikit-learn's PCA",(projection_-projection).sum()) 
+L=1
+Xhat=U[:,:L]@np.diag(s[0:L])@VT[:L,:] # resconstruct X
+print ("error SVD vs scikit-learn's PCA",((Xhat-X_sklearn)**2).sum()) 
+s[0]**2/(200-1)
+pca.explained_variance_

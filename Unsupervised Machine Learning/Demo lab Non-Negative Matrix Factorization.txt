@@ -1,0 +1,40 @@
+import urllib
+with urllib.request.urlopen('https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBM-ML0187EN-SkillsNetwork/labs/module%203/data/bbc.mtx') as r:
+    content = r.readlines()[2:]
+sparsemat = [tuple(map(int,map(float,c.split()))) for c in content]
+# Let's examine the first few elements
+sparsemat[:8]
+import numpy as np
+from scipy.sparse import coo_matrix
+rows = [x[0] for x in sparsemat]
+cols = [x[1] for x in sparsemat]
+values = [x[2] for x in sparsemat]
+coo = coo_matrix((values, (rows, cols)))
+# Surpress warnings from using older version of sklearn:
+def warn(*args, **kwargs):
+    pass
+import warnings
+warnings.warn = warn
+
+from sklearn.decomposition import NMF
+model = NMF(n_components=5, init='random', random_state=818)
+doc_topic = model.fit_transform(coo)
+
+doc_topic.shape
+# we should have 9636 observations (articles) and five latent features
+# find feature with highest value per doc
+np.argmax(doc_topic, axis=1)
+model.components_.shape
+with urllib.request.urlopen('https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBM-ML0187EN-SkillsNetwork/labs/module%203/data/bbc.terms') as r:
+    content = r.readlines()
+words = [c.split()[0] for c in content]
+topic_words = []
+for r in model.components_:
+    a = sorted([(v,i) for i,v in enumerate(r)],reverse=True)[0:12]
+    topic_words.append([words[e[1]] for e in a])
+# Here, each set of words relates to the corresponding topic (ie the first set of words relates to topic 'Business', etc.)
+topic_words[:5]
+with urllib.request.urlopen('https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBM-ML0187EN-SkillsNetwork/labs/module%203/data/bbc.docs') as r:
+    doc_content = r.readlines()
+    
+doc_content[:8]
