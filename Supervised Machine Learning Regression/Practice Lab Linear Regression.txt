@@ -1,0 +1,215 @@
+# All Libraries required for this lab are listed below. The libraries pre-installed on Skills Network Labs are commented.
+# !mamba install -qy pandas==1.3.4 numpy==1.21.4 seaborn==0.9.0 matplotlib==3.5.0 scikit-learn==0.20.1
+# Note: If your environment doesn't support "!mamba install", use "!pip install"
+#!pip install -U scikit-learn
+
+import piplite
+await piplite.install(['tqdm', 'seaborn', 'skillsnetwork', 'pandas', 'numpy', 'scikit-learn'])
+from tqdm import tqdm
+import skillsnetwork
+import numpy as np
+import pandas as pd
+from itertools import accumulate
+import matplotlib.pyplot as plt
+import seaborn as sns
+%matplotlib inline
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LogisticRegression
+from sklearn.datasets import load_digits, load_wine
+from scipy.stats import boxcox
+from scipy.stats.mstats import normaltest
+
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import r2_score 
+from sklearn.metrics import mean_squared_error
+from sklearn.pipeline import Pipeline
+import sklearn; print("Scikit-Learn", sklearn.__version__)
+# Surpress warnings:
+def warn(*args, **kwargs):
+    pass
+import warnings
+warnings.warn = warn
+URL = 'https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBM-ML240EN-SkillsNetwork/labs/data/CarPrice_Assignment.csv'
+
+await skillsnetwork.download_dataset(URL)
+print('file downloaded')
+
+data = pd.read_csv('CarPrice_Assignment.csv')
+data.head()
+data.info()
+data.describe()
+data.isnull().sum()
+sum(data.duplicated(subset = 'car_ID')) == 0
+data["CarName"].unique()
+data['brand'] = data.CarName.str.split(' ').str.get(0).str.lower()
+data.brand.unique()
+data['brand'] = data['brand'].replace(['vw', 'vokswagen'], 'volkswagen')
+data['brand'] = data['brand'].replace(['maxda'], 'mazda')
+data['brand'] = data['brand'].replace(['porcshce'], 'porsche')
+data['brand'] = data['brand'].replace(['toyouta'], 'toyota')
+data.brand.unique()
+fig, ax = plt.subplots(figsize = (15,5))
+plt1 = sns.countplot(x=data['brand'], order=pd.value_counts(data['brand']).index)
+plt1.set(xlabel = 'Brand', ylabel= 'Count of Cars')
+plt.show()
+plt.tight_layout()
+data.drop(['car_ID', 'symboling', 'CarName'],axis = 1, inplace = True)
+data.info()
+#If you need to save this partially processed data, uncomment the line below.
+#data.to_csv('cleaned_car_data.csv', index=False)
+python data.fueltype.unique() data["enginelocation"].value_counts()
+data_comp_avg_price = data[['brand','price']].groupby('brand', as_index = False).mean().rename(columns={'price':'brand_avg_price'})
+
+data = data.merge(data_comp_avg_price, on = 'brand')
+data.brand_avg_price.describe()
+data['brand_category'] = data['brand_avg_price'].apply(lambda x : "Budget" if x < 10000 
+                                                     else ("Mid_Range" if 10000 <= x < 20000
+                                                           else "Luxury"))
+plt.figure(figsize=(10, 20))
+plt.subplot(4,2,1)
+sns.boxplot(x = 'fueltype', y = 'price', data = data)
+plt.subplot(4,2,2)
+sns.boxplot(x = 'aspiration', y = 'price', data = data)
+plt.subplot(4,2,3)
+sns.boxplot(x = 'carbody', y = 'price', data = data)
+plt.subplot(4,2,4)
+sns.boxplot(x = 'drivewheel', y = 'price', data = data)
+plt.subplot(4,2,5)
+sns.boxplot(x = 'enginetype', y = 'price', data = data)
+plt.subplot(4,2,6)
+sns.boxplot(x = 'brand_category', y = 'price', data = data)
+plt.tight_layout()
+plt.show()
+corr_matrix = data.corr()
+corr_matrix['price'].sort_values(ascending=False)
+python
+sns.pairplot(data) plt.show()
+fig, (ax1, ax2) = plt.subplots(figsize = (12,8), ncols=2,sharey=False)
+sns.scatterplot( x = data.enginesize, y = data.price,  ax=ax1)
+sns.regplot(x=data.enginesize, y=data.price, ax=ax1)
+ 
+sns.scatterplot(x = data.horsepower,y = data.price, ax=ax2)
+sns.regplot(x=data.horsepower, y=data.price, ax=ax2);
+python sns.regplot(x=data.curbweight, y=data.price, data=data)
+plt.subplots(figsize = (12,8))
+sns.residplot(x=data["enginesize"], y=data["price"])
+def plotting_3_chart(data, feature):
+    ## Importing seaborn, matplotlab and scipy modules. 
+    import seaborn as sns
+    import matplotlib.pyplot as plt
+    import matplotlib.gridspec as gridspec
+    from scipy import stats
+    import matplotlib.style as style
+    style.use('fivethirtyeight')
+
+    ## Creating a customized chart. and giving in figsize and everything. 
+    fig = plt.figure(constrained_layout=True, figsize=(12,8))
+    ## creating a grid of 3 cols and 3 rows. 
+    grid = gridspec.GridSpec(ncols=3, nrows=3, figure=fig)
+    #gs = fig3.add_gridspec(3, 3)
+
+    ## Customizing the histogram grid. 
+    ax1 = fig.add_subplot(grid[0, :2])
+    ## Set the title. 
+    ax1.set_title('Histogram')
+    ## plot the histogram. 
+    sns.distplot(data.loc[:,feature], norm_hist=True, ax = ax1)
+
+    # customizing the QQ_plot. 
+    ax2 = fig.add_subplot(grid[1, :2])
+    ## Set the title. 
+    ax2.set_title('QQ_plot')
+    ## Plotting the QQ_Plot. 
+    stats.probplot(data.loc[:,feature], plot = ax2)
+
+    ## Customizing the Box Plot. 
+    ax3 = fig.add_subplot(grid[:, 2])
+    ## Set title. 
+    ax3.set_title('Box Plot')
+    ## Plotting the box plot. 
+    sns.boxplot(data.loc[:,feature], orient='v', ax = ax3);
+    
+plotting_3_chart(data, 'price')
+previous_data = data.copy()
+normaltest(data.price.values)
+data['price'] = np.log(data['price'])
+plotting_3_chart(data, 'price')
+normaltest(data.price.values)
+cp_result = boxcox(previous_data.price) boxcox_price = cp_result[0]
+normaltest(boxcox_price)
+plt.figure(figsize = (30, 25)) sns.heatmap(data.corr(), annot = True, cmap="YlGnBu") plt.show()
+columns=['price', 'fueltype', 'aspiration','carbody', 'drivewheel','wheelbase', 'brand_category',
+                  'curbweight', 'enginetype', 'cylindernumber', 'enginesize', 'boreratio','horsepower', 'carlength','carwidth','citympg','highwaympg']
+
+
+
+selected = data[columns]
+selected.info()
+categorical_columns=[key for key, value in selected.dtypes.iteritems()  if value=='O']
+categorical_columns
+numeric_columns=list(set(columns)-set(categorical_columns)) numeric_columns
+X = selected.drop("price", axis=1)
+X.head()
+y = selected["price"].copy()
+y.head()
+for column in  categorical_columns:
+    print("column name:", column)
+    print("value_count:")
+    print( X[column].value_counts())
+from sklearn.preprocessing import OneHotEncoder
+from sklearn.compose import ColumnTransformer
+one_hot = ColumnTransformer(transformers=[("one_hot", OneHotEncoder(), categorical_columns) ],remainder="passthrough")
+X=one_hot.fit_transform(X)
+type(X)
+names=one_hot.get_feature_names_out()
+names
+colunm_names=[name[name.find("_")+1:] for name in  [name[name.find("__")+2:] for name in names]]
+colunm_names
+df=pd.DataFrame(data=X,columns=colunm_names)
+#df.to_csv('cleaned_car_data.csv', index=False)
+X_ = selected[categorical_columns+numeric_columns]
+
+X_numeric=X[numeric_columns].to_numpy() X_categorical=OneHotEncoder().fit_transform(X_[categorical_columns]).toarray() X_=np.concatenate((X_categorical,X_numeric), axis = 1)
+def dummies(x,data):
+temp = pd.get_dummies(data[x], drop_first = True)
+data = pd.concat([data, temp], axis = 1)
+data.drop([x], axis = 1, inplace = True)
+return data
+
+
+X_ = selected[categorical_columns+numeric_columns]
+N_column=0
+
+
+for column in  categorical_columns:
+print(pd.unique(data[column]))
+
+
+X_ = dummies(column,X_)
+from sklearn.model_selection import train_test_split
+X_train, X_test, y_train, y_test = train_test_split( df, y, test_size=0.30, random_state=0)
+from sklearn.preprocessing import StandardScaler
+ss=StandardScaler()
+ss
+X_train=ss.fit_transform(X_train)
+lm = LinearRegression()
+lm.fit(X_train,y_train)
+X_test=ss.transform(X_test)
+car_price_predictions = lm.predict(X_test)
+car_price_predictions
+mse = mean_squared_error(y_test, car_price_predictions)
+mse
+lm.score(X_test,y_test)
+from sklearn.metrics import r2_score
+r2_score(y_test,car_price_predictions)
+steps=[('scaler', StandardScaler()), ('lm',  LinearRegression())]
+pipe = Pipeline(steps=steps)
+pipe.fit(X_train,y_train)
+car_price_predictions = pipe.predict(X_test)
+mse = mean_squared_error(y_test, car_price_predictions)
+rmse = np.sqrt(mse)
+rmse
+r2_score(car_price_predictions, y_test)
+X = selected[categorical_columns+numeric_columns] one_hot = ColumnTransformer(transformers=[("one_hot", OneHotEncoder(), categorical_columns) ],remainder="passthrough") steps=[('one_hot',one_hot), ('scaler', StandardScaler()), ('lm', LinearRegression())]
+
+pipe = Pipeline(steps=steps) pipe.fit(X,y) car_price_predictions=pipe.predict(X) r2_score(car_price_predictions, y)

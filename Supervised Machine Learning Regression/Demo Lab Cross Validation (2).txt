@@ -1,0 +1,194 @@
+import piplite
+await piplite.install(['tqdm', 'seaborn', 'skillsnetwork', 'pandas', 'numpy', 'scikit-learn'])
+# Surpress warnings:
+def warn(*args, **kwargs):
+    pass
+import warnings
+warnings.warn = warn
+
+import numpy as np
+import pickle
+import pandas as pd
+import matplotlib.pyplot as plt
+import skillsnetwork
+
+from sklearn.preprocessing import StandardScaler, PolynomialFeatures
+from sklearn.model_selection import KFold, cross_val_predict
+from sklearn.linear_model import LinearRegression, Lasso, Ridge
+from sklearn.metrics import r2_score
+from sklearn.pipeline import Pipeline
+# Note we are loading a slightly different ("cleaned") pickle file
+
+URL = 'https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBM-ML240EN-SkillsNetwork/labs/data/boston_housing_clean.pickle'
+await skillsnetwork.download_dataset(URL)
+
+boston = pickle.load(open('boston_housing_clean.pickle', "rb" ))
+boston.keys()
+boston_data = boston['dataframe']
+boston_description = boston['description']
+boston_data.head()
+X = boston_data.drop('MEDV', axis=1)
+y = boston_data.MEDV
+kf = KFold(shuffle=True, random_state=72018, n_splits=3)
+for train_index, test_index in kf.split(X):
+    print("Train index:", train_index[:10], len(train_index))
+    print("Test index:",test_index[:10], len(test_index))
+    print('')
+#from sklearn.metrics import r2_score, mean_squared_error
+
+scores = []
+lr = LinearRegression()
+
+for train_index, test_index in kf.split(X):
+    X_train, X_test, y_train, y_test = (X.iloc[train_index, :], 
+                                        X.iloc[test_index, :], 
+                                        y[train_index], 
+                                        y[test_index])
+    
+    lr.fit(X_train, y_train)
+        
+    y_pred = lr.predict(X_test)
+
+    score = r2_score(y_test.values, y_pred)
+    
+    scores.append(score)
+    
+scores
+scores = []
+
+lr = LinearRegression()
+s = StandardScaler()
+
+for train_index, test_index in kf.split(X):
+    X_train, X_test, y_train, y_test = (X.iloc[train_index, :], 
+                                        X.iloc[test_index, :], 
+                                        y[train_index], 
+                                        y[test_index])
+    
+    X_train_s = s.fit_transform(X_train)
+    
+    lr.fit(X_train_s, y_train)
+    
+    X_test_s = s.transform(X_test)
+    
+    y_pred = lr.predict(X_test_s)
+
+    score = r2_score(y_test.values, y_pred)
+    
+    scores.append(score)
+scores
+s = StandardScaler()
+lr = LinearRegression()
+estimator = Pipeline([("scaler", s),
+                      ("regression", lr)])
+kf
+predictions = cross_val_predict(estimator, X, y, cv=kf)
+r2_score(y, predictions)
+np.mean(scores) # almost identical!
+alphas = np.geomspace(1e-9, 1e0, num=10)
+alphas
+scores = []
+coefs = []
+for alpha in alphas:
+    las = Lasso(alpha=alpha, max_iter=100000)
+    
+    estimator = Pipeline([
+        ("scaler", s),
+        ("lasso_regression", las)])
+
+    predictions = cross_val_predict(estimator, X, y, cv = kf)
+    
+    score = r2_score(y, predictions)
+    
+    scores.append(score)
+list(zip(alphas,scores))
+Lasso(alpha=1e-6).fit(X, y).coef_
+Lasso(alpha=1.0).fit(X, y).coef_
+plt.figure(figsize=(10,6))
+plt.semilogx(alphas, scores, '-o')
+plt.xlabel('$\\alpha$')
+plt.ylabel('$R^2$');
+pf = PolynomialFeatures(degree=3)
+
+scores = []
+alphas = np.geomspace(0.06, 6.0, 20)
+for alpha in alphas:
+    las = Lasso(alpha=alpha, max_iter=100000)
+    
+    estimator = Pipeline([
+        ("scaler", s),
+        ("make_higher_degree", pf),
+        ("lasso_regression", las)])
+
+    predictions = cross_val_predict(estimator, X, y, cv = kf)
+    
+    score = r2_score(y, predictions)
+    
+    scores.append(score)
+plt.semilogx(alphas, scores);
+# Once we have found the hyperparameter (alpha~1e-2=0.01)
+# make the model and train it on ALL the data
+# Then release it into the wild .....
+best_estimator = Pipeline([
+                    ("scaler", s),
+                    ("make_higher_degree", PolynomialFeatures(degree=2)),
+                    ("lasso_regression", Lasso(alpha=0.03))])
+
+best_estimator.fit(X, y)
+best_estimator.score(X, y)
+best_estimator.named_steps["lasso_regression"].coef_
+pf = PolynomialFeatures(degree=2)
+alphas = np.geomspace(4, 20, 20)
+scores=[]
+for alpha in alphas:
+    ridge = Ridge(alpha=alpha, max_iter=100000)
+
+    estimator = Pipeline([
+        ("scaler", s),
+        ("polynomial_features", pf),
+        ("ridge_regression", ridge)])
+
+    predictions = cross_val_predict(estimator, X, y, cv = kf)
+    score = r2_score(y, predictions)
+    scores.append(score)
+
+plt.plot(alphas, scores)
+# Once we have found the hyperparameter (alpha~1e-2=0.01)
+# make the model and train it on ALL the data
+# Then release it into the wild .....
+best_estimator = Pipeline([
+                    ("scaler", s),
+                    ("make_higher_degree", PolynomialFeatures(degree=2)),
+                    ("lasso_regression", Lasso(alpha=0.03))])
+
+best_estimator.fit(X, y)
+best_estimator.score(X, y)
+df_importances = pd.DataFrame(zip(best_estimator.named_steps["make_higher_degree"].get_feature_names(),
+                 best_estimator.named_steps["lasso_regression"].coef_,
+))
+col_names_dict = dict(zip(list(range(len(X.columns.values))), X.columns.values))
+col_names_dict
+df_importances.sort_values(by=1)
+from sklearn.model_selection import GridSearchCV
+
+# Same estimator as before
+estimator = Pipeline([("scaler", StandardScaler()),
+        ("polynomial_features", PolynomialFeatures()),
+        ("ridge_regression", Ridge())])
+
+params = {
+    'polynomial_features__degree': [1, 2, 3],
+    'ridge_regression__alpha': np.geomspace(4, 20, 30)
+}
+
+grid = GridSearchCV(estimator, params, cv=kf)
+grid.fit(X, y)
+grid.best_score_, grid.best_params_
+y_predict = grid.predict(X)
+# This includes both in-sample and out-of-sample
+r2_score(y, y_predict)
+# Notice that "grid" is a fit object!
+# We can use grid.predict(X_test) to get brand new predictions!
+grid.best_estimator_.named_steps['ridge_regression'].coef_
+grid.cv_results_
+

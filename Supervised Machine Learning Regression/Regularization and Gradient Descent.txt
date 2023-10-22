@@ -1,0 +1,333 @@
+# Surpress warnings from using older version of sklearn:
+def warn(*args, **kwargs):
+    pass
+import warnings
+warnings.warn = warn
+import pandas as pd
+import numpy as np
+
+
+data = pd.read_csv("https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBM-ML240EN-SkillsNetwork/labs/data/X_Y_Sinusoid_Data.csv")
+data.head()
+
+X_real = np.linspace(0, 1.0, 100)
+Y_real = np.sin(2 * np.pi * X_real)
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+%matplotlib inline
+sns.set_style('white')
+sns.set_context('talk')
+sns.set_palette('dark')
+
+# Plot of the noisy (sparse)
+ax = data.set_index('x')['y'].plot(ls='', marker='o', label='data')
+ax.plot(X_real, Y_real, ls='--', marker='', label='real function')
+
+ax.legend()
+ax.set(xlabel='x data', ylabel='y data');
+from sklearn.preprocessing import PolynomialFeatures
+from sklearn.linear_model import LinearRegression
+
+# Setup the polynomial features
+degree = 20
+pf = PolynomialFeatures(degree)
+lr = LinearRegression()
+
+# Extract the X- and Y- data from the dataframe 
+X_data = data[['x']]
+Y_data = data['y']
+
+# Create the features and fit the model
+X_poly = pf.fit_transform(X_data)
+lr = lr.fit(X_poly, Y_data)
+Y_pred = lr.predict(X_poly)
+
+# Plot the result
+plt.plot(X_data, Y_data, marker='o', ls='', label='data', alpha=1)
+plt.plot(X_real, Y_real, ls='--', label='real function')
+plt.plot(X_data, Y_pred, marker='^', alpha=.5, label='predictions w/ polynomial features')
+plt.legend()
+ax = plt.gca()
+ax.set(xlabel='x data', ylabel='y data');
+# Mute the sklearn warning about regularization
+import warnings
+warnings.filterwarnings('ignore', module='sklearn')
+
+from sklearn.linear_model import Ridge, Lasso
+
+# The ridge regression model
+rr = Ridge(alpha=0.001)
+rr = rr.fit(X_poly, Y_data)
+Y_pred_rr = rr.predict(X_poly)
+
+# The lasso regression model
+lassor = Lasso(alpha=0.0001)
+lassor = lassor.fit(X_poly, Y_data)
+Y_pred_lr = lassor.predict(X_poly)
+
+# The plot of the predicted values
+plt.plot(X_data, Y_data, marker='o', ls='', label='data')
+plt.plot(X_real, Y_real, ls='--', label='real function')
+plt.plot(X_data, Y_pred, label='linear regression', marker='^', alpha=.5)
+plt.plot(X_data, Y_pred_rr, label='ridge regression', marker='^', alpha=.5)
+plt.plot(X_data, Y_pred_lr, label='lasso regression', marker='^', alpha=.5)
+
+plt.legend()
+
+ax = plt.gca()
+ax.set(xlabel='x data', ylabel='y data');
+# let's look at the absolute value of coefficients for each model
+
+coefficients = pd.DataFrame()
+coefficients['linear regression'] = lr.coef_.ravel()
+coefficients['ridge regression'] = rr.coef_.ravel()
+coefficients['lasso regression'] = lassor.coef_.ravel()
+coefficients = coefficients.applymap(abs)
+
+coefficients.describe()  # Huge difference in scale between non-regularized vs regularized regression
+colors = sns.color_palette()
+
+# Setup the dual y-axes
+ax1 = plt.axes()
+ax2 = ax1.twinx()
+
+# Plot the linear regression data
+ax1.plot(lr.coef_.ravel(), 
+         color=colors[0], marker='o', label='linear regression')
+
+# Plot the regularization data sets
+ax2.plot(rr.coef_.ravel(), 
+         color=colors[1], marker='o', label='ridge regression')
+
+ax2.plot(lassor.coef_.ravel(), 
+         color=colors[2], marker='o', label='lasso regression')
+
+# Customize axes scales
+ax1.set_ylim(-2e14, 2e14)
+ax2.set_ylim(-25, 25)
+
+# Combine the legends
+h1, l1 = ax1.get_legend_handles_labels()
+h2, l2 = ax2.get_legend_handles_labels()
+ax1.legend(h1+h2, l1+l2)
+
+ax1.set(xlabel='coefficients',ylabel='linear regression')
+ax2.set(ylabel='ridge and lasso regression')
+
+ax1.set_xticks(range(len(lr.coef_)));
+data = pd.read_csv("https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBM-ML240EN-SkillsNetwork/labs/data/Ames_Housing_Sales.csv")
+data.head(10)
+# Get a Pd.Series consisting of all the string categoricals
+one_hot_encode_cols = data.dtypes[data.dtypes == np.object]  # filtering by string categoricals
+one_hot_encode_cols = one_hot_encode_cols.index.tolist()  # list of categorical fields
+
+# Here we see another way of one-hot-encoding:
+# Encode these columns as categoricals so one hot encoding works on split data (if desired)
+for col in one_hot_encode_cols:
+    data[col] = pd.Categorical(data[col])
+
+# Do the one hot encoding
+data = pd.get_dummies(data, columns=one_hot_encode_cols)
+from sklearn.model_selection import train_test_split
+
+train, test = train_test_split(data, test_size=0.3, random_state=42)
+# Create a list of float colums to check for skewing
+mask = data.dtypes == np.float
+float_cols = data.columns[mask]
+skew_limit = 0.75
+skew_vals = train[float_cols].skew()
+
+skew_cols = (skew_vals
+             .sort_values(ascending=False)
+             .to_frame()
+             .rename(columns={0:'Skew'})
+             .query('abs(Skew) > {0}'.format(skew_limit)))
+
+skew_cols
+# OPTIONAL: Let's look at what happens to one of these features, when we apply np.log1p visually.
+
+field = "BsmtFinSF1"
+fig, (ax_before, ax_after) = plt.subplots(1, 2, figsize=(10, 5))
+train[field].hist(ax=ax_before)
+train[field].apply(np.log1p).hist(ax=ax_after)
+ax_before.set(title='before np.log1p', ylabel='frequency', xlabel='value')
+ax_after.set(title='after np.log1p', ylabel='frequency', xlabel='value')
+fig.suptitle('Field "{}"'.format(field));
+# a little bit better
+# Mute the setting wtih a copy warnings
+pd.options.mode.chained_assignment = None
+
+for col in skew_cols.index.tolist():
+    if col == "SalePrice":
+        continue
+    train[col] = np.log1p(train[col])
+    test[col]  = test[col].apply(np.log1p)  # same thing
+feature_cols = [x for x in train.columns if x != 'SalePrice']
+X_train = train[feature_cols]
+y_train = train['SalePrice']
+
+X_test  = test[feature_cols]
+y_test  = test['SalePrice']
+from sklearn.metrics import mean_squared_error
+
+
+def rmse(ytrue, ypredicted):
+    return np.sqrt(mean_squared_error(ytrue, ypredicted))
+from sklearn.linear_model import LinearRegression
+
+linearRegression = LinearRegression().fit(X_train, y_train)
+
+linearRegression_rmse = rmse(y_test, linearRegression.predict(X_test))
+
+print(linearRegression_rmse)
+f = plt.figure(figsize=(6,6))
+ax = plt.axes()
+
+ax.plot(y_test, linearRegression.predict(X_test), 
+         marker='o', ls='', ms=3.0)
+
+lim = (0, y_test.max())
+
+ax.set(xlabel='Actual Price', 
+       ylabel='Predicted Price', 
+       xlim=lim,
+       ylim=lim,
+       title='Linear Regression Results');
+from sklearn.linear_model import RidgeCV
+
+alphas = [0.005, 0.05, 0.1, 0.3, 1, 3, 5, 10, 15, 30, 80]
+
+ridgeCV = RidgeCV(alphas=alphas, 
+                  cv=4).fit(X_train, y_train)
+
+ridgeCV_rmse = rmse(y_test, ridgeCV.predict(X_test))
+
+print(ridgeCV.alpha_, ridgeCV_rmse)
+from sklearn.linear_model import LassoCV
+
+alphas2 = np.array([1e-5, 5e-5, 0.0001, 0.0005])
+
+lassoCV = LassoCV(alphas=alphas2,
+                  max_iter=5e4,
+                  cv=3).fit(X_train, y_train)
+
+lassoCV_rmse = rmse(y_test, lassoCV.predict(X_test))
+
+print(lassoCV.alpha_, lassoCV_rmse)  # Lasso is slower
+print('Of {} coefficients, {} are non-zero with Lasso.'.format(len(lassoCV.coef_), 
+                                                               len(lassoCV.coef_.nonzero()[0])))
+from sklearn.linear_model import ElasticNetCV
+
+l1_ratios = np.linspace(0.1, 0.9, 9)
+
+elasticNetCV = ElasticNetCV(alphas=alphas2, 
+                            l1_ratio=l1_ratios,
+                            max_iter=1e4).fit(X_train, y_train)
+elasticNetCV_rmse = rmse(y_test, elasticNetCV.predict(X_test))
+
+print(elasticNetCV.alpha_, elasticNetCV.l1_ratio_, elasticNetCV_rmse)
+rmse_vals = [linearRegression_rmse, ridgeCV_rmse, lassoCV_rmse, elasticNetCV_rmse]
+
+labels = ['Linear', 'Ridge', 'Lasso', 'ElasticNet']
+
+rmse_df = pd.Series(rmse_vals, index=labels).to_frame()
+rmse_df.rename(columns={0: 'RMSE'}, inplace=1)
+rmse_df
+f = plt.figure(figsize=(6,6))
+ax = plt.axes()
+
+labels = ['Ridge', 'Lasso', 'ElasticNet']
+
+models = [ridgeCV, lassoCV, elasticNetCV]
+
+for mod, lab in zip(models, labels):
+    ax.plot(y_test, mod.predict(X_test), 
+             marker='o', ls='', ms=3.0, label=lab)
+
+
+leg = plt.legend(frameon=True)
+leg.get_frame().set_edgecolor('black')
+leg.get_frame().set_linewidth(1.0)
+
+ax.set(xlabel='Actual Price', 
+       ylabel='Predicted Price', 
+       title='Linear Regression Results');
+# Import SGDRegressor and prepare the parameters
+
+from sklearn.linear_model import SGDRegressor
+
+model_parameters_dict = {
+    'Linear': {'penalty': 'none'},
+    'Lasso': {'penalty': 'l2',
+           'alpha': lassoCV.alpha_},
+    'Ridge': {'penalty': 'l1',
+           'alpha': ridgeCV_rmse},
+    'ElasticNet': {'penalty': 'elasticnet', 
+                   'alpha': elasticNetCV.alpha_,
+                   'l1_ratio': elasticNetCV.l1_ratio_}
+}
+
+new_rmses = {}
+for modellabel, parameters in model_parameters_dict.items():
+    # following notation passes the dict items as arguments
+    SGD = SGDRegressor(**parameters)
+    SGD.fit(X_train, y_train)
+    new_rmses[modellabel] = rmse(y_test, SGD.predict(X_test))
+
+rmse_df['RMSE-SGD'] = pd.Series(new_rmses)
+rmse_df
+# Import SGDRegressor and prepare the parameters
+
+from sklearn.linear_model import SGDRegressor
+
+model_parameters_dict = {
+    'Linear': {'penalty': 'none'},
+    'Lasso': {'penalty': 'l2',
+           'alpha': lassoCV.alpha_},
+    'Ridge': {'penalty': 'l1',
+           'alpha': ridgeCV_rmse},
+    'ElasticNet': {'penalty': 'elasticnet', 
+                   'alpha': elasticNetCV.alpha_,
+                   'l1_ratio': elasticNetCV.l1_ratio_}
+}
+
+new_rmses = {}
+for modellabel, parameters in model_parameters_dict.items():
+    # following notation passes the dict items as arguments
+    SGD = SGDRegressor(eta0=1e-7, **parameters)
+    SGD.fit(X_train, y_train)
+    new_rmses[modellabel] = rmse(y_test, SGD.predict(X_test))
+
+rmse_df['RMSE-SGD-learningrate'] = pd.Series(new_rmses)
+rmse_df
+from sklearn.preprocessing import MinMaxScaler
+
+scaler = MinMaxScaler()
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
+
+new_rmses = {}
+for modellabel, parameters in model_parameters_dict.items():
+    # following notation passes the dict items as arguments
+    SGD = SGDRegressor(**parameters)
+    SGD.fit(X_train_scaled, y_train)
+    new_rmses[modellabel] = rmse(y_test, SGD.predict(X_test_scaled))
+
+rmse_df['RMSE-SGD-scaled'] = pd.Series(new_rmses)
+rmse_df
+from sklearn.preprocessing import MinMaxScaler
+
+scaler = MinMaxScaler()
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
+
+new_rmses = {}
+for modellabel, parameters in model_parameters_dict.items():
+    # following notation passes the dict items as arguments
+    SGD = SGDRegressor(**parameters)
+    SGD.fit(X_train_scaled, y_train)
+    new_rmses[modellabel] = rmse(y_test, SGD.predict(X_test_scaled))
+
+rmse_df['RMSE-SGD-scaled'] = pd.Series(new_rmses)
+rmse_df

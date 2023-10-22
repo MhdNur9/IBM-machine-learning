@@ -1,0 +1,117 @@
+#!pip install -U scikit-learn
+import piplite
+await piplite.install(['tqdm', 'seaborn', 'skillsnetwork', 'pandas', 'numpy', 'scikit-learn'])
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+%matplotlib inline
+import skillsnetwork
+# Surpress warnings:
+def warn(*args, **kwargs):
+    pass
+import warnings
+warnings.warn = warn
+np.random.seed(72018)
+
+from sklearn.datasets import load_boston
+
+def to_2d(array):
+    return array.reshape(array.shape[0], -1)
+
+def boston_dataframe(description=False):
+    boston = load_boston()
+    
+    data = boston.data
+    target = boston.target
+    names = boston.feature_names
+    
+    target = to_2d(target)
+    
+    data_all = np.concatenate([data, target], axis=1)
+    names_all = np.concatenate([names, np.array(['MEDV'])], axis=0)
+    
+    if description:
+        
+        return pd.DataFrame(data=data_all, columns=names_all), boston.DESCR
+    
+    else: 
+        
+        return pd.DataFrame(data=data_all, columns=names_all)
+    
+def plot_exponential_data():
+    data = np.exp(np.random.normal(size=1000))
+    plt.hist(data)
+    plt.show()
+    return data
+    
+def plot_square_normal_data():
+    data = np.square(np.random.normal(loc=5, size=1000))
+    plt.hist(data)
+    plt.show()
+    return data
+boston_data = boston_dataframe()
+boston_data.head(15)
+boston_data.MEDV.hist();
+from scipy.stats.mstats import normaltest # D'Agostino K^2 Test
+normaltest(boston_data.MEDV.values)
+data = plot_exponential_data()
+plt.hist(np.log(data));
+log_medv = np.log(boston_data.MEDV)
+log_medv.hist();
+normaltest(log_medv)
+data = plot_square_normal_data()
+plt.hist(np.sqrt(data));
+# Instructor Solution
+
+sqrt_medv = np.sqrt(boston_data.MEDV)
+plt.hist(sqrt_medv)
+normaltest(sqrt_medv)
+from scipy.stats import boxcox
+bc_result = boxcox(boston_data.MEDV)
+boxcox_medv = bc_result[0]
+lam = bc_result[1]
+lam
+boston_data['MEDV'].hist();
+plt.hist(boxcox_medv);
+normaltest(boxcox_medv)
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import r2_score
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import (StandardScaler, 
+                                   PolynomialFeatures)
+lr = LinearRegression()
+boston_data = boston_dataframe()
+y_col = "MEDV"
+
+X = boston_data.drop(y_col, axis=1)
+y = boston_data[y_col]
+pf = PolynomialFeatures(degree=2, include_bias=False)
+X_pf = pf.fit_transform(X)
+X_train, X_test, y_train, y_test = train_test_split(X_pf, y, test_size=0.3, 
+                                                    random_state=72018)
+s = StandardScaler()
+X_train_s = s.fit_transform(X_train)
+# Instructor Solution
+bc_result2 = boxcox(y_train)
+y_train_bc = bc_result2[0]
+lam2 = bc_result2[1]
+y_train_bc.shape
+lr.fit(X_train_s, y_train_bc)
+X_test_s = s.transform(X_test)
+y_pred_bc = lr.predict(X_test_s)
+from scipy.special import inv_boxcox
+# code from above
+bc_result = boxcox(boston_data.MEDV)
+boxcox_medv = bc_result[0]
+lam = bc_result[1]
+inv_boxcox(boxcox_medv, lam)[:10]
+boston_data['MEDV'].values[:10]
+# Instructor Solution
+y_pred_tran = inv_boxcox(y_pred_bc,lam2)
+r2_score(y_pred_tran,y_test)
+### BEGIN SOLUTION
+lr = LinearRegression()
+lr.fit(X_train_s,y_train)
+lr_pred = lr.predict(X_test_s)
+r2_score(lr_pred,y_test)
+### END SOLUTION

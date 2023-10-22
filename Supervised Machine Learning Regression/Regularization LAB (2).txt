@@ -1,0 +1,214 @@
+import piplite
+await piplite.install(['tqdm', 'seaborn', 'skillsnetwork', 'pandas', 'numpy'])
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+%matplotlib inline
+import skillsnetwork
+
+# Surpress warnings:
+def warn(*args, **kwargs):
+    pass
+import warnings
+warnings.warn = warn
+
+np.set_printoptions(precision=3, suppress=True)
+np.random.seed(72018)
+
+from sklearn.datasets import load_boston
+
+def to_2d(array):
+    return array.reshape(array.shape[0], -1)
+
+def boston_dataframe(description=False):
+    boston = load_boston()
+    
+    data = boston.data
+    target = boston.target
+    names = boston.feature_names
+    
+    target = to_2d(target)
+    
+    data_all = np.concatenate([data, target], axis=1)
+    names_all = np.concatenate([names, np.array(['MEDV'])], axis=0)
+    
+    if description:
+        
+        return pd.DataFrame(data=data_all, columns=names_all), boston.DESCR
+    
+    else: 
+        
+        return pd.DataFrame(data=data_all, columns=names_all)
+    
+def plot_exponential_data():
+    data = np.exp(np.random.normal(size=1000))
+    plt.hist(data)
+    plt.show()
+    return data
+    
+def plot_square_normal_data():
+    data = np.square(np.random.normal(loc=5, size=1000))
+    plt.hist(data)
+    plt.show()
+    return data
+boston = boston_dataframe(description=True)
+boston_data = boston[0]
+boston_description = boston[1]
+y_col = "MEDV"
+
+X = boston_data.drop(y_col, axis=1)
+y = boston_data[y_col]
+from sklearn.preprocessing import StandardScaler
+
+s = StandardScaler()
+X_ss = s.fit_transform(X)
+#Hint:
+
+a = np.array([[1, 2, 3], 
+              [4, 5, 6]]) 
+print(a) # 2 rows, 3 columns
+a.mean(axis=0) # mean along the *columns*
+a.mean(axis=1) # mean along the *rows*
+### BEGIN SOLUTION
+X2 = np.array(X)
+man_transform = (X2-X2.mean(axis=0))/X2.std(axis=0)
+np.allclose(man_transform, X_ss)
+### END SOLUTION
+from sklearn.linear_model import LinearRegression
+lr = LinearRegression()
+
+y_col = "MEDV"
+
+X = boston_data.drop(y_col, axis=1)
+y = boston_data[y_col]
+lr.fit(X, y)
+print(lr.coef_) # min = -18
+from sklearn.preprocessing import StandardScaler
+s = StandardScaler()
+X_ss = s.fit_transform(X)
+lr2 = LinearRegression()
+lr2.fit(X_ss, y)
+print(lr2.coef_) # coefficients now "on the same scale"
+### BEGIN SOLUTION
+pd.DataFrame(zip(X.columns, lr2.coef_)).sort_values(by=1)
+### END SOLUTION
+from sklearn.linear_model import Lasso
+from sklearn.preprocessing import PolynomialFeatures
+pf = PolynomialFeatures(degree=2, include_bias=False,)
+X_pf = pf.fit_transform(X)
+X_pf_ss = s.fit_transform(X_pf)
+las = Lasso()
+las.fit(X_pf_ss, y)
+las.coef_ 
+### BEGIN SOLUTION
+las01 = Lasso(alpha = 0.1)
+las01.fit(X_pf_ss, y)
+print('sum of coefficients:', abs(las01.coef_).sum() )
+print('number of coefficients not equal to 0:', (las01.coef_!=0).sum())
+las1 = Lasso(alpha = 1)
+las1.fit(X_pf_ss, y)
+print('sum of coefficients:',abs(las1.coef_).sum() )
+print('number of coefficients not equal to 0:',(las1.coef_!=0).sum())
+### END SOLUTION
+### BEGIN SOLUTION
+from sklearn.metrics import r2_score
+r2_score(y,las.predict(X_pf_ss))
+### END SOLUTION
+from sklearn.model_selection import train_test_split
+X_train, X_test, y_train, y_test = train_test_split(X_pf, y, test_size=0.3, 
+                                                    random_state=72018)
+X_train_s = s.fit_transform(X_train)
+las.fit(X_train_s, y_train)
+X_test_s = s.transform(X_test)
+y_pred = las.predict(X_test_s)
+r2_score(y_pred, y_test)
+X_train_s = s.fit_transform(X_train)
+las01.fit(X_train_s, y_train)
+X_test_s = s.transform(X_test)
+y_pred = las01.predict(X_test_s)
+r2_score(y_pred, y_test)
+
+### BEGIN SOLUTION
+
+# Part 1
+
+# Decreasing regularization and ensuring convergence
+las001 = Lasso(alpha = 0.001, max_iter=100000)
+
+# Transforming training set to get standardized units
+X_train_s = s.fit_transform(X_train)
+
+# Fitting model to training set
+las001.fit(X_train_s, y_train)
+
+# Transforming test set using the parameters defined from training set
+X_test_s = s.transform(X_test)
+
+# Finding prediction on test set
+y_pred = las001.predict(X_test_s)
+
+# Calculating r2 score
+print("r2 score for alpha = 0.001:", r2_score(y_pred, y_test))
+
+
+# Part 2
+
+# Using vanilla Linear Regression
+lr = LinearRegression()
+
+# Fitting model to training set
+lr.fit(X_train_s, y_train)
+
+# predicting on test set
+y_pred_lr = lr.predict(X_test_s)
+
+# Calculating r2 score
+print("r2 score for Linear Regression:", r2_score(y_pred_lr, y_test))
+
+
+# Part 3
+print('Magnitude of Lasso coefficients:', abs(las001.coef_).sum())
+print('Number of coeffients not equal to 0 for Lasso:', (las001.coef_!=0).sum())
+
+print('Magnitude of Linear Regression coefficients:', abs(lr.coef_).sum())
+print('Number of coeffients not equal to 0 for Linear Regression:', (lr.coef_!=0).sum())
+### END SOLUTION
+from sklearn.linear_model import Ridge
+### BEGIN SOLUTION
+# Decreasing regularization and ensuring convergence
+r = Ridge(alpha = 0.001)
+X_train_s = s.fit_transform(X_train)
+r.fit(X_train_s, y_train)
+X_test_s = s.transform(X_test)
+y_pred_r = r.predict(X_test_s)
+
+# Calculating r2 score
+r.coef_
+### END SOLUTION
+las001 # same alpha as Ridge above
+las001.coef_
+print(np.sum(np.abs(r.coef_)))
+print(np.sum(np.abs(las001.coef_)))
+
+print(np.sum(r.coef_ != 0))
+print(np.sum(las001.coef_ != 0))
+y_pred = r.predict(X_pf_ss)
+print(r2_score(y, y_pred))
+
+y_pred = las001.predict(X_pf_ss)
+print(r2_score(y, y_pred))
+X_train, X_test, y_train, y_test = train_test_split(X_ss, y, test_size=0.3, 
+                                                    random_state=72018)
+lr = LinearRegression()
+lr.fit(X_train, y_train)
+y_pred = lr.predict(X_test)
+r2_score(y_pred, y_test)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, 
+                                                    random_state=72018)
+s = StandardScaler()
+lr_s = LinearRegression()
+X_train_s = s.fit_transform(X_train)
+lr_s.fit(X_train_s, y_train)
+X_test_s = s.transform(X_test)
+y_pred_s = lr_s.predict(X_test_s)
+r2_score(y_pred_s, y_test)
