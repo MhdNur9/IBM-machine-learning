@@ -1,0 +1,153 @@
+import piplite
+await piplite.install(['pandas', 'skillsnetwork', 'seaborn'])
+# Surpress warnings:
+def warn(*args, **kwargs):
+    pass
+import warnings
+warnings.warn = warn
+%pylab inline
+%config InlineBackend.figure_formats = ['retina']
+
+import pandas as pd
+import seaborn as sns
+import skillsnetwork
+sns.set()
+## Load in the Ames Housing Data
+URL = 'https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBM-ML0232EN-SkillsNetwork/asset/Ames_Housing_Data.tsv'
+
+await skillsnetwork.download_dataset(URL)
+df = pd.read_csv('Ames_Housing_Data.tsv', sep='\t')
+## Examine the columns, look at missing data
+df.info()
+# This is recommended by the data set author to remove a few outliers
+
+df = df.loc[df['Gr Liv Area'] <= 4000,:]
+print("Number of rows in the data:", df.shape[0])
+print("Number of columns in the data:", df.shape[1])
+data = df.copy() # Keep a copy our original data 
+# A quick look at the data:
+df.head()
+# Get a Pd.Series consisting of all the string categoricals
+one_hot_encode_cols = df.dtypes[df.dtypes == np.object]  # filtering by string categoricals
+one_hot_encode_cols = one_hot_encode_cols.index.tolist()  # list of categorical fields
+
+df[one_hot_encode_cols].head().T
+# Do the one hot encoding
+df = pd.get_dummies(df, columns=one_hot_encode_cols, drop_first=True)
+df.describe().T
+# Create a list of float colums to check for skewing
+mask = data.dtypes == np.float
+float_cols = data.columns[mask]
+
+skew_limit = 0.75 # define a limit above which we will log transform
+skew_vals = data[float_cols].skew()
+# Showing the skewed columns
+skew_cols = (skew_vals
+             .sort_values(ascending=False)
+             .to_frame()
+             .rename(columns={0:'Skew'})
+             .query('abs(Skew) > {}'.format(skew_limit)))
+
+skew_cols
+# Let's look at what happens to one of these features, when we apply np.log1p visually.
+
+# Choose a field
+field = "BsmtFin SF 1"
+
+# Create two "subplots" and a "figure" using matplotlib
+fig, (ax_before, ax_after) = plt.subplots(1, 2, figsize=(10, 5))
+
+# Create a histogram on the "ax_before" subplot
+df[field].hist(ax=ax_before)
+
+# Apply a log transformation (numpy syntax) to this column
+df[field].apply(np.log1p).hist(ax=ax_after)
+
+# Formatting of titles etc. for each subplot
+ax_before.set(title='before np.log1p', ylabel='frequency', xlabel='value')
+ax_after.set(title='after np.log1p', ylabel='frequency', xlabel='value')
+fig.suptitle('Field "{}"'.format(field));
+# Perform the skew transformation:
+
+for col in skew_cols.index.values:
+    if col == "SalePrice":
+        continue
+    df[col] = df[col].apply(np.log1p)
+# We now have a larger set of potentially-useful features
+df.shape
+# There are a *lot* of variables. Let's go back to our saved original data and look at how many values are missing for each variable. 
+df = data
+data.isnull().sum().sort_values()
+smaller_df= df.loc[:,['Lot Area', 'Overall Qual', 'Overall Cond', 
+                      'Year Built', 'Year Remod/Add', 'Gr Liv Area', 
+                      'Full Bath', 'Bedroom AbvGr', 'Fireplaces', 
+                      'Garage Cars','SalePrice']]
+# Now we can look at summary statistics of the subset data
+smaller_df.describe().T
+smaller_df.info()
+# There appears to be one NA in Garage Cars - we will take a simple approach and fill it with 0
+smaller_df = smaller_df.fillna(0)
+smaller_df.info()
+sns.pairplot(smaller_df, plot_kws=dict(alpha=.1, edgecolor='none'))
+#Separate our features from our target
+
+X = smaller_df.loc[:,['Lot Area', 'Overall Qual', 'Overall Cond', 
+                      'Year Built', 'Year Remod/Add', 'Gr Liv Area', 
+                      'Full Bath', 'Bedroom AbvGr', 'Fireplaces', 
+                      'Garage Cars']]
+
+y = smaller_df['SalePrice']
+X.info()
+X2 = X.copy()
+
+X2['OQ2'] = X2['Overall Qual'] ** 2
+X2['GLA2'] = X2['Gr Liv Area'] ** 2
+
+X3 = X2.copy()
+
+# multiplicative interaction
+X3['OQ_x_YB'] = X3['Overall Qual'] * X3['Year Built']
+
+# division interaction
+X3['OQ_/_LA'] = X3['Overall Qual'] / X3['Lot Area']
+
+
+data['House Style'].value_counts()
+pd.get_dummies(df['House Style'], drop_first=True).head()
+nbh_counts = df.Neighborhood.value_counts()
+nbh_counts
+other_nbhs = list(nbh_counts[nbh_counts <= 8].index)
+
+other_nbhs
+X4 = X3.copy()
+
+X4['Neighborhood'] = df['Neighborhood'].replace(other_nbhs, 'Other')
+
+def add_deviation_feature(X, feature, category):
+    
+    # temp groupby object
+    category_gb = X.groupby(category)[feature]
+    
+    # create category means and standard deviations for each observation
+    category_mean = category_gb.transform(lambda x: x.mean())
+    category_std = category_gb.transform(lambda x: x.std())
+    
+    # compute stds from category mean for each feature value,
+    # add to X as new feature
+    deviation_feature = (X[feature] - category_mean) / category_std 
+    X[feature + '_Dev_' + category] = deviation_feature 
+X5 = X4.copy()
+X5['House Style'] = df['House Style']
+add_deviation_feature(X5, 'Year Built', 'House Style')
+add_deviation_feature(X5, 'Overall Qual', 'Neighborhood')
+
+from sklearn.preprocessing import PolynomialFeatures
+#Instantiate and provide desired degree; 
+#   Note: degree=2 also includes intercept, degree 1 terms, and cross-terms
+
+pf = PolynomialFeatures(degree=2)
+features = ['Lot Area', 'Overall Qual']
+pf.fit(df[features])
+pf.get_feature_names()  #Must add input_features = features for appropriate names
+feat_array = pf.transform(df[features])
+pd.DataFrame(feat_array, columns = pf.get_feature_names(input_features=features))

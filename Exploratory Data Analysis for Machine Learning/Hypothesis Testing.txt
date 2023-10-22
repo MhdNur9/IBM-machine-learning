@@ -1,0 +1,56 @@
+import piplite
+await piplite.install(['matplotlib', 'numpy', 'scipy'])
+# see https://ipython.readthedocs.io/en/stable/interactive/magics.html
+%pylab inline
+
+%config InlineBackend.figure_formats = ['svg']
+
+import matplotlib.pyplot as plt
+import numpy as np
+from scipy import stats 
+import math
+from scipy.stats import binom
+prob = 1 - binom.cdf(56, 100, 0.5)
+
+print(str(round(prob*100, 1))+"%")
+from scipy.stats import binom
+print(binom.ppf(0.95,100,0.5)+1)
+mu = 50
+variance = 10
+sigma = math.sqrt(variance)
+x = np.linspace(1, 100, 200)
+plt.plot(x,stats.norm.pdf(x, mu, sigma))
+
+mu = 60
+variance = 10
+sigma = math.sqrt(variance)
+x = np.linspace(1, 100, 200)
+plt.plot(x,stats.norm.pdf(x, mu, sigma))
+
+plt.xlim(30,80)
+plt.show()
+print (1 - binom.cdf(57, 100, 0.5))
+print (binom.cdf(57, 100, 0.6))
+print (1 - binom.cdf(55, 100, 0.5))
+print (binom.cdf(54, 100, 0.6))
+binom.ppf(0.95, 100, 0.5) #this is the inverse of the cdf functions above
+print (1-binom.cdf(58, 100, 0.5))
+print (binom.cdf(58, 100, 0.6))
+mu = 50
+variance = 1
+sigma = math.sqrt(variance)
+x = np.linspace(1, 100, 1000)
+plt.plot(x,stats.norm.pdf(x, mu, sigma))
+
+mu = 60
+variance = 1
+sigma = math.sqrt(variance)
+x = np.linspace(1, 100, 1000)
+plt.plot(x,stats.norm.pdf(x, mu, sigma))
+
+plt.xlim(45,65)
+plt.show()
+print (binom.ppf(0.95,1000,0.5))
+print (binom.ppf(0.05,1000,0.6))
+print (1-binom.cdf(550, 1000, 0.5))
+print (binom.cdf(550, 1000, 0.6))

@@ -1,0 +1,98 @@
+# All Libraries required for this lab are listed below. The libraries pre-installed on Skills Network Labs are commented.
+# !mamba install -qy pandas==1.3.4 numpy==1.21.4 seaborn==0.9.0 matplotlib==3.5.0 scikit-learn==0.20.1
+# Note: If your environment doesn't support "!mamba install", use "!pip install"
+import piplite
+await piplite.install(['pandas', 'numpy', 'seaborn', 'matplotlib', 'scikit-learn', 'scipy', 'skillsnetwork'])
+import warnings 
+warnings.filterwarnings('ignore')
+import skillsnetwork
+import pandas as pd
+import numpy as np 
+
+import seaborn as sns 
+import matplotlib.pylab as plt
+%matplotlib inline
+
+from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import MinMaxScaler
+
+from scipy.stats import norm
+from scipy import stats
+## Load in the Ames Housing Data
+URL = 'https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBM-ML0232EN-SkillsNetwork/asset/Ames_Housing_Data1.tsv'
+
+await skillsnetwork.download_dataset(URL)
+housing = pd.read_csv('Ames_Housing_Data1.tsv', sep='\t')
+
+housing.head(10)
+housing.info()
+housing["SalePrice"].describe()
+
+housing["Sale Condition"].value_counts()
+hous_num = housing.select_dtypes(include = ['float64', 'int64'])
+hous_num_corr = hous_num.corr()['SalePrice'][:-1] # -1 means that the latest row is SalePrice
+top_features = hous_num_corr[abs(hous_num_corr) > 0.5].sort_values(ascending=False) #displays pearsons correlation coefficient greater than 0.5
+print("There is {} strongly correlated values with SalePrice:\n{}".format(len(top_features), top_features))
+for i in range(0, len(hous_num.columns), 5):
+    sns.pairplot(data=hous_num,
+                x_vars=hous_num.columns[i:i+5],
+                y_vars=['SalePrice'])
+sp_untransformed = sns.distplot(housing['SalePrice'])
+print("Skewness: %f" % housing['SalePrice'].skew())
+log_transformed = np.log(housing['SalePrice'])
+sp_transformed = sns.distplot(log_transformed)
+print("Skewness: %f" % (log_transformed).skew())
+la_plot = sns.distplot(housing['Lot Area'])
+print("Skewness: %f" % housing['Lot Area'].skew())
+la_log = np.log(housing['Lot Area'])
+print("Skewness: %f" % la_log.skew())
+duplicate = housing[housing.duplicated(['PID'])]
+duplicate
+dup_removed = housing.drop_duplicates()
+dup_removed 
+housing.index.is_unique
+removed_sub = housing.drop_duplicates(subset=['Order'])
+total = housing.isnull().sum().sort_values(ascending=False)
+total_select = total.head(20)
+total_select.plot(kind="bar", figsize = (8,6), fontsize = 10)
+
+plt.xlabel("Columns", fontsize = 20)
+plt.ylabel("Count", fontsize = 20)
+plt.title("Total Missing Values", fontsize = 20)
+housing.dropna(subset=["Lot Frontage"])
+housing.drop("Lot Frontage", axis=1)
+median = housing["Lot Frontage"].median()
+median
+housing["Lot Frontage"].fillna(median, inplace = True)
+housing.tail()
+
+mean = housing["Mas Vnr Area"].mean()
+housing["Mas Vnr Area"].fillna(mean, inplace = True)   
+norm_data = MinMaxScaler().fit_transform(hous_num)
+norm_data
+scaled_data = StandardScaler().fit_transform(hous_num)
+scaled_data
+   
+scaled_sprice = StandardScaler().fit_transform(housing['SalePrice'][:,np.newaxis]) 
+scaled_sprice
+sns.boxplot(x=housing['Lot Area'])
+sns.boxplot(x=housing['SalePrice'])
+price_area = housing.plot.scatter(x='Gr Liv Area',
+                      y='SalePrice')
+housing.sort_values(by = 'Gr Liv Area', ascending = False)[:2]
+outliers_dropped = housing.drop(housing.index[[1499,2181]])
+new_plot = outliers_dropped.plot.scatter(x='Gr Liv Area',
+                                         y='SalePrice')
+ 
+sns.boxplot(x=housing['Lot Area'])
+price_lot = housing.plot.scatter(x='Lot Area', y='SalePrice')   
+housing['Lot_Area_Stats'] = stats.zscore(housing['Lot Area'])
+housing[['Lot Area','Lot_Area_Stats']].describe().round(3)
+housing.sort_values(by = 'Lot Area', ascending = False)[:1]
+lot_area_rem = housing.drop(housing.index[[957]])
+housing['LQFSF_Stats'] = stats.zscore(housing['Low Qual Fin SF'])
+housing[['Low Qual Fin SF','LQFSF_Stats']].describe().round(3)
+
+
+
+

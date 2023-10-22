@@ -1,0 +1,90 @@
+# All Libraries required for this lab are listed below. The libraries pre-installed on Skills Network Labs are commented.
+# !mamba install -qy pandas==1.3.4 numpy==1.21.4 seaborn==0.9.0 matplotlib==3.5.0 scikit-learn==0.20.1
+# Note: If your environment doesn't support "!mamba install", use "!pip install"
+import piplite
+await piplite.install(['pandas', 'numpy', 'seaborn', 'matplotlib', 'scipy', 'statsmodels', 'skillsnetwork'])
+import warnings 
+warnings.filterwarnings('ignore')
+import skillsnetwork
+
+import pandas as pd
+import numpy as np
+
+import matplotlib.pyplot as plt
+%matplotlib inline
+import seaborn as sns
+
+import scipy.stats as stats 
+from scipy.stats import chi2_contingency
+
+from statsmodels.formula.api import ols
+from statsmodels.stats.anova import anova_lm 
+URL = 'https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBM-ML0232EN-SkillsNetwork/asset/insurance.csv'
+
+await skillsnetwork.download_dataset(URL)
+data = pd.read_csv('insurance.csv')
+
+data.head()
+data.info()
+data.describe()
+female=data.loc[data.sex=="female"]
+male=data.loc[data.sex=="male"]
+f_bmi = female.bmi
+m_bmi = male.bmi
+sns.distplot(f_bmi,color='green',hist=False)
+sns.distplot(m_bmi,color='red',hist=False)
+female.bmi.mean()
+male.bmi.mean()
+alpha=0.05
+t_value1, p_value1 = stats.ttest_ind(m_bmi, f_bmi)
+print("t_value1 = ",t_value1, ", p_value1 = ", p_value1)
+if p_value1 <alpha:
+    print("Conclusion: since p_value {} is less than alpha {} ". format (p_value1,alpha))
+    print("Reject the null hypothesis that there is no difference between bmi of females and bmi of males.")
+    
+else:
+    print("Conclusion: since p_value {} is greater than alpha {} ". format (p_value1,alpha))
+    print("Fail to reject the null hypothesis that there is a difference between bmi of females and bmi of males.")
+smoker = data.loc[data.smoker=="yes"]
+smoker_char = smoker.charges
+sch_mean = smoker_char.mean()
+sch_mean
+nonsmoker = data.loc[data.smoker=="no"]
+nonsmoker_char = nonsmoker.charges
+
+nsch_mean = nonsmoker_char.mean()
+nsch_mean
+sns.boxplot(x=data.charges,y=data.smoker,data=data).set(title="Fig:1 Smoker vs Charges")
+alpha=0.05
+t_val2, p_value2 = stats.ttest_ind(smoker_char, nonsmoker_char)
+p_value_onetail=p_value2/2
+print("t_value = {} , p_value ={} , p_value_onetail = {}".format(t_val2, p_value2, p_value_onetail))
+# Use proper indentation when executing the code below
+if p_value2 \<alpha :
+    print("Conclusion:Since p_value {} is less than alpha {} ". format (p_value_onetail,alpha) )
+    print("Reject null hypothesis that average charges for smokers are less than or equal to nonsmokers.")
+
+else:
+print("Conclusion:Since p value {} is greater than alpha {} ". format (p_value_onetail,alpha))
+print("Failed to reject null hypothesis that average charges for smokers are less than nonsmoker.")
+
+female_children = female.loc[female['children']<=2]
+female_children.groupby([female_children.children]).mean().bmi
+sns.boxplot(x="children", y="bmi", data=female_children)
+plt.grid()
+plt.show()
+formula = 'bmi ~ C(children)'
+model = ols(formula, female_children).fit()
+aov_table = anova_lm(model)
+aov_table
+contingency= pd.crosstab(data.region, data.smoker)
+contingency
+contingency.plot(kind='bar')
+chi2, p_val, dof, exp_freq = chi2_contingency(contingency, correction = False)
+print('chi-square statistic: {} , p_value: {} , degree of freedom: {} ,expected frequencies: {} '.format(chi2, p_val, dof, exp_freq))
+# Use proper indentation when executing the code below
+
+if (p_val < 0.05):
+print('Reject the null hypothesis, that the smokers proportions are not significantly different across the different regions')
+else:
+print('Accept the null hypothesis, that the smokers proportions are not significantly different across the different regions')

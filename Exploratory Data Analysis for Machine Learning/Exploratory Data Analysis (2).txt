@@ -1,0 +1,154 @@
+# All Libraries required for this lab are listed below. The libraries pre-installed on Skills Network Labs are commented.
+# !mamba install -qy pandas==1.3.4 numpy==1.21.4 seaborn==0.9.0 matplotlib==3.5.0 scikit-learn==0.20.1
+# Note: If your environment doesn't support "!mamba install", use "!pip install"
+import pandas as pd
+import plotly.express as px
+import datetime 
+import requests
+import json
+gasoline = pd.read_csv("https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBM-ML0232EN-SkillsNetwork/asset/18100001.csv")
+gasoline.head()
+gasoline.shape
+gasoline.info()
+gasoline.columns
+gasoline.isnull().sum()
+data = (gasoline[['REF_DATE','GEO','Type of fuel','VALUE']]).rename(columns={"REF_DATE" : "DATE", "Type of fuel" : "TYPE"})
+data.head()
+data[['City', 'Province']] = data['GEO'].str.split(',', n=1, expand=True)
+data.head()
+data['DATE'] = pd.to_datetime(data['DATE'], format='%b-%y')
+data['Month'] = data['DATE'].dt.month_name().str.slice(stop=3)
+data['Year'] = data['DATE'].dt.year
+data.head()
+data.VALUE.describe()
+# can also use  data['VALUE'].describe()
+data.GEO.unique().tolist()
+# can also use  data['GEO'].unique().tolist()
+   
+data.TYPE.unique().tolist()
+calgary = data[data['GEO'] == 'Calgary, Alberta']
+calgary
+sel_years = data[data['Year'] ==  2000]
+sel_years
+mult_loc = data[(data['GEO'] == "Toronto, Ontario") | (data['GEO'] == "Edmonton, Alberta")]
+mult_loc
+cities = ['Calgary', 'Toronto', 'Edmonton']
+CTE = data[data.City.isin(cities)]
+CTE
+   
+exercise2a = data[( data['Year'] ==  1990) & (data['TYPE'] == "Household heating fuel") & (data['City']=='Vancouver')]
+exercise2a
+exercise2b = data[( data['Year'] <=  1979) | ( data['Year'] ==  2021) & (data['TYPE'] == "Household heating fuel") & (data['City']=='Vancouver')]
+exercise2b
+geo = data.groupby('GEO')
+geo.ngroups
+group_year = data.groupby(['Year'])['VALUE'].mean()
+group_year
+ Enter your code below and run the cell
+exercise3b = data.groupby(['Year', 'City'])['VALUE'].median()
+   
+exercise3a = data.groupby(['Month'])['VALUE'].max()
+  
+exercise3b = data.groupby(['Year', 'City'])['VALUE'].median()
+price_bycity = data.groupby(['Year', 'GEO'])['VALUE'].mean().reset_index(name ='Value').round(2)
+fig = px.line(price_bycity
+                   ,x='Year', y = "Value", 
+                   color = "GEO", color_discrete_sequence=px.colors.qualitative.Light24)
+fig.update_traces(mode='markers+lines')
+fig.update_layout(
+    title="Gasoline Price Trend per City",
+    xaxis_title="Year",
+    yaxis_title="Annual Average Price, Cents per Litre")
+fig.show()
+mon_trend = data[(data['Year'] ==  2021) & (data['GEO'] == "Toronto, Ontario")]
+group_month = mon_trend.groupby(['Month'])['VALUE'].mean().reset_index().sort_values(by="VALUE")
+fig = px.line(group_month,
+                   x='Month', y = "VALUE")
+fig.update_traces(mode='markers+lines')
+fig.update_layout(
+    title="Toronto Average Monthly Gasoline Price in 2021",
+    xaxis_title="Month",
+    yaxis_title="Monthly Price, Cents per Litre")
+fig.show()
+type_gas = data.groupby(['Year', 'TYPE'])['VALUE'].mean().reset_index(name ='Type').round(2)
+fig = px.line(type_gas,
+                   x='Year', y = "Type", 
+                   color = "TYPE", color_discrete_sequence=px.colors.qualitative.Light24)
+fig.update_traces(mode='markers+lines')
+fig.update_layout(
+    title="Fuel Type Price Trend",
+    xaxis_title="Year",
+    yaxis_title="Annual Average Price, Cents per Litre")
+fig.show()
+
+bycity = data.groupby(['Year', 'City'])['VALUE'].mean().reset_index(name ='Value').round(2)
+bycity.head()
+fig = px.bar(bycity,  
+            x='City', y = "Value", animation_frame="Year")
+fig.update_layout(
+    title="Time Lapse of Average Price of Gasoline, by Province",
+    xaxis_title="Year",
+    yaxis_title="Average Price of Gasoline, Cents per Litre")
+
+fig.show()
+one_year = data[data['Year'] == 2021]
+one_year.head()
+geodata =  one_year.groupby('Province')['VALUE'].mean().reset_index(name ='Average Gasoline Price').round(2)
+
+provinces={' Newfoundland and Labrador':5,
+ ' Prince Edward Island':8,
+ ' Nova Scotia':2,
+ ' New Brunswick':7,
+ ' Quebec':1,
+ ' Ontario':11,
+ ' Ontario part, Ontario/Quebec':12,
+ ' Manitoba':10,
+ ' Saskatchewan':3,
+ ' Alberta':4,
+ ' British Columbia':6,
+ ' Yukon':9,
+ ' Northwest Territories':13
+}
+geodata['ProvinceID']=geodata['Province'].map(provinces)
+display(geodata)
+
+
+geo = requests.get("https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBM-ML0232EN-SkillsNetwork/asset/canada_provinces.geojson")
+mp = json.loads(geo.text)
+    
+fig = px.choropleth(geodata,
+                    locations="ProvinceID",
+                    geojson=mp,
+                    featureidkey="properties.cartodb_id",
+                    color="Average Gasoline Price",
+                    color_continuous_scale=px.colors.diverging.Tropic,
+                    scope='north america',
+                    title='<b>Average Gasoline Price </b>',                
+                    hover_name='Province',
+                    hover_data={
+                        'Average Gasoline Price' : True,
+                        'ProvinceID' : False
+                    },
+                     
+                    locationmode='geojson-id',
+                    )
+fig.update_layout(
+    showlegend=True,
+    legend_title_text='<b>Average Gasoline Price</b>',
+    font={"size": 16, "color": "#808080", "family" : "calibri"},
+    margin={"r":0,"t":40,"l":0,"b":0},
+    legend=dict(orientation='v'),
+    geo=dict(bgcolor='rgba(0,0,0,0)', lakecolor='#e0fffe')
+)
+
+#Show Canada only 
+fig.update_geos(showcountries=False, showcoastlines=False,
+                showland=False, fitbounds="locations",
+                subunitcolor='white')
+fig.show()
+
+    px.colors.diverging.Tropic
+    px.colors.diverging.Temps
+    px.colors.sequential.Greens
+    px.colors.sequential.Reds
+
