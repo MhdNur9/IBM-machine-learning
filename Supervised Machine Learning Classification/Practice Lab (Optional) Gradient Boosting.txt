@@ -1,0 +1,259 @@
+import pandas as pd
+import pylab as plt
+import numpy as np
+import scipy.optimize as opt
+from sklearn import preprocessing
+%matplotlib inline 
+import matplotlib.pyplot as plt
+from sklearn import metrics
+from sklearn.tree import DecisionTreeRegressor
+from tqdm import tqdm
+import warnings
+warnings.filterwarnings('ignore')
+def get_accuracy(X_train, X_test, y_train, y_test, model):
+    return  {"test Accuracy":metrics.accuracy_score(y_test, model.predict(X_test)),"trian Accuracy": metrics.accuracy_score(y_train, model.predict(X_train))}
+def get_accuracy_boost(X,y,title,times=20,xlabel='Number Estimators',Learning_rate_=[0.2,0.4,0.6,1], n_est = 100):
+
+    lines_array=['solid','--', '-.', ':']
+
+    N_estimators=[n*2 for n in range(1,n_est//2)]
+    
+    train_acc=np.zeros((times,len(Learning_rate_),len(N_estimators)))
+    test_acc=np.zeros((times,len(Learning_rate_),len(N_estimators)))
+
+
+    #Iterate through different number of Learning rate  and average out the results  
+    
+    for n in tqdm(range(times)):
+        X_train, X_test, y_train, y_test = train_test_split( X, y, test_size=0.3)
+        for n_estimators in N_estimators:
+            for j,lr in enumerate(Learning_rate_):
+
+
+                model = XGBClassifier(objective=objective,learning_rate=lr,n_estimators=n_estimators,eval_metric='mlogloss')
+
+
+                model.fit(X_train,y_train)
+
+
+
+                Accuracy=get_accuracy(X_train, X_test, y_train, y_test,  model)
+
+
+
+                train_acc[n,j,(n_estimators//2)-1]=Accuracy['trian Accuracy']
+                test_acc[n,j,(n_estimators//2)-1]=Accuracy['test Accuracy']
+    
+
+
+
+    fig, ax1 = plt.subplots()
+    mean_test=test_acc.mean(axis=0)
+    mean_train=train_acc.mean(axis=0)
+    ax2 = ax1.twinx()
+
+    for j,(lr,line) in enumerate(zip(Learning_rate_,lines_array)): 
+
+        ax1.plot(mean_train[j,:],linestyle = line,color='b',label="Learning rate "+str(lr))
+        ax2.plot(mean_test[j,:],linestyle = line, color='r',label=str(lr))
+
+    ax1.set_ylabel('Training accuracy',color='b')
+    ax1.legend()
+    ax2.set_ylabel('Testing accuracy', color='r')
+    ax2.legend()
+    ax1.set_xlabel(xlabel)
+    plt.show()
+churn_df = pd.read_csv("https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBMDeveloperSkillsNetwork-ML0101EN-SkillsNetwork/labs/Module%203/data/ChurnData.csv")
+
+churn_df.head()
+churn_df = churn_df[['tenure', 'age', 'address', 'income', 'ed', 'employ', 'equip',   'callcard', 'wireless','churn']]
+churn_df['churn'] = churn_df['churn'].astype('int')
+churn_df.head()
+X=churn_df[['tenure', 'age', 'address', 'income', 'ed', 'employ', 'equip']]
+y = churn_df['churn']
+y.head()
+from sklearn.model_selection import train_test_split
+X_train, X_test, y_train, y_test = train_test_split( X, y, test_size=0.3, random_state=1)
+print ('Train set', X_train.shape,  y_train.shape)
+print ('Test set', X_test.shape,  y_test.shape)
+!mamba install -y xgboost
+from xgboost import XGBClassifier
+n_estimators=5
+random_state=0
+objective='binary:logistic'
+learning_rate=0.1
+model =XGBClassifier(objective=objective,learning_rate=learning_rate,n_estimators=n_estimators,eval_metric='mlogloss')
+model 
+print("learning rate:", model.learning_rate)
+print("lobjective:", model.objective)
+print("n_estimators:", model.n_estimators)
+
+model.fit(X_train, y_train)
+y_pred = model.predict(X_test)
+y_pred 
+print(get_accuracy(X_train, X_test, y_train, y_test,  model))
+learning_rate=0.3
+model =XGBClassifier(objective=objective,learning_rate=learning_rate,n_estimators=n_estimators)
+model.fit(X_train, y_train)
+print(get_accuracy(X_train, X_test, y_train, y_test,  model))
+n_estimators=100
+model =XGBClassifier(objective=objective,learning_rate=learning_rate,n_estimators=n_estimators)
+model.fit(X_train, y_train)
+print(get_accuracy(X_train, X_test, y_train, y_test,  model))
+get_accuracy_boost(X,y,title="Training and Test Accuracy vs Weak Classifiers",times=10,xlabel='Number Estimators', n_est = 10)
+eval_metric="error"
+eval_set = [(X_test, y_test)]
+model.fit(X_train, y_train, eval_metric=eval_metric, eval_set=eval_set, verbose=True)
+results = model.evals_result()
+print(results)
+plt.plot(range(0, len(results['validation_0']['error'])), results['validation_0']['error'])
+plt.xlabel('iterations')
+plt.ylabel('Misclassified Samples')
+eval_metric='logloss'
+eval_set = [(X_train, y_train), (X_test, y_test)]
+model.fit(X_train, y_train, eval_metric=eval_metric, eval_set=eval_set,verbose=False)
+results=model.evals_result()
+results.keys()
+fig, ax = plt.subplots()
+ax.plot( results['validation_0']['logloss'], label='Train')
+ax.plot( results['validation_1']['logloss'], label='Test/Validation')
+ax.legend()
+plt.show()
+early_stopping_rounds=10
+eval_set = [(X_test, y_test)]
+eval_metric='logloss'
+model.fit(X_train, y_train, eval_metric=eval_metric, eval_set=eval_set, verbose=True,early_stopping_rounds=early_stopping_rounds)
+print(get_accuracy(X_train, X_test, y_train, y_test,  model))
+objective='binary:logistic'
+learning_rate=0.1
+n_estimators=10
+model =XGBClassifier(objective=objective,learning_rate=learning_rate,n_estimators=n_estimators,eval_metric='mlogloss')
+model.fit(X_train, y_train)
+print(get_accuracy(X_train, X_test, y_train, y_test,  model))
+max_depth=3
+model =XGBClassifier(objective=objective,learning_rate=learning_rate,n_estimators=n_estimators,eval_metric='mlogloss',max_depth=max_depth)
+model.fit(X_train, y_train)
+print(get_accuracy(X_train, X_test, y_train, y_test,  model))
+min_child_weight=4
+model =XGBClassifier(objective=objective,learning_rate=learning_rate,n_estimators=n_estimators,eval_metric='mlogloss',min_child_weight=4)
+model.fit(X_train, y_train)
+print(get_accuracy(X_train, X_test, y_train, y_test,  model))
+gamma=1
+reg_lambda=2
+alpha=1
+model =XGBClassifier(objective=objective,learning_rate=learning_rate,n_estimators=n_estimators,eval_metric='mlogloss',gamma=gamma,reg_lambda=reg_lambda,alpha=alpha)
+model.fit(X_train, y_train)
+print(get_accuracy(X_train, X_test, y_train, y_test,  model))
+df = pd.read_csv("https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBMDeveloperSkillsNetwork-ML0101EN-SkillsNetwork/labs/Module%203/data/cell_samples.csv")
+
+df.head()
+df= df[pd.to_numeric(df['BareNuc'], errors='coerce').notnull()]
+X =  df[['Clump', 'UnifSize', 'UnifShape', 'MargAdh', 'SingEpiSize', 'BareNuc', 'BlandChrom', 'NormNucl', 'Mit']]
+
+X.head()
+X=X.astype('int64')
+y=df['Class']
+y.unique()
+X_train, X_test, y_train, y_test = train_test_split( X, y, test_size=0.2, random_state=4)
+print ('Train set:', X_train.shape,  y_train.shape)
+print ('Test set:', X_test.shape,  y_test.shape)
+from sklearn.model_selection import GridSearchCV
+model =XGBClassifier(objective='binary:logistic',eval_metric='mlogloss')
+param_grid = {'learning_rate': [0.1*(n+1) for n in range(5)],
+             'n_estimators' : [2*n+1 for n in range(5)]}
+
+param_grid 
+search = GridSearchCV(estimator=model, param_grid=param_grid,scoring="neg_log_loss")
+search.fit(X_train, y_train)
+search.best_score_
+search.best_params_
+
+print(get_accuracy(X_train, X_test, y_train, y_test, search.best_estimator_))
+df = pd.read_csv("https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBMDeveloperSkillsNetwork-ML0101EN-SkillsNetwork/labs/Module%203/data/drug200.csv", delimiter=",")
+df.head()
+X = df[['Age', 'Sex', 'BP', 'Cholesterol', 'Na_to_K']].values
+X[0:5]
+y = df["Drug"]
+y[0:5]
+from sklearn import preprocessing
+le_sex = preprocessing.LabelEncoder()
+le_sex.fit(['F','M'])
+X[:,1] = le_sex.transform(X[:,1]) 
+
+
+le_BP = preprocessing.LabelEncoder()
+le_BP.fit([ 'LOW', 'NORMAL', 'HIGH'])
+X[:,2] = le_BP.transform(X[:,2])
+
+
+le_Chol = preprocessing.LabelEncoder()
+le_Chol.fit([ 'NORMAL', 'HIGH'])
+X[:,3] = le_Chol.transform(X[:,3]) 
+
+X[0:5]
+X_train, X_test, y_train, y_test = train_test_split( X, y, test_size=0.2, random_state=4)
+print ('Train set:', X_train.shape,  y_train.shape)
+print ('Test set:', X_test.shape,  y_test.shape)
+param_grid = {'learning_rate': [0.1*(n+1) for n in range(2)],
+             'n_estimators' : [2*n+1 for n in range(2)] }
+
+
+param_grid
+model =XGBClassifier(objective='binary:logistic',eval_metric='mlogloss')
+search = GridSearchCV(estimator=model, param_grid=param_grid,scoring="neg_log_loss")
+search.fit(X_train, y_train)
+search.best_score_
+search.best_params_
+print(get_accuracy(X_train, X_test, y_train, y_test, search.best_estimator_))
+x = np.linspace(-1, 2)
+fig, (ax1, ax2) = plt.subplots(1, 2)
+ax1.plot(x, x**2, linewidth=2)
+ax1.set_title('convex function')
+ax2.plot(x, x**2 + np.exp(-5*(x - .5)**2), linewidth=2)
+ax2.set_title('non-convex function')
+plt.show()
+plt.plot(x, x**2, linewidth=2)
+plt.text(-.7, 3, '$ \ell(H_{T}+h_{t},y_i)$', size=20)
+plt.plot(x, 2*x - 1)
+plt.plot(1, 1, 'k+')
+plt.text(.3, -.75, 'approximation', size=15)
+plt.show()
+plt.plot(x, x**2, linewidth=2)
+plt.text(-.7, 3, '$ \ell(H_{T}+h_{t},y_i)$', size=20)
+plt.plot(x, 2*x - 1)
+plt.plot(1, 1, 'k+')
+plt.text(.3, -.75, 'approximation', size=15)
+plt.show()
+reg = DecisionTreeRegressor(max_depth=1)
+reg.fit(X.reshape(-1,1),y)
+h_1=reg.predict(X.reshape(-1,1))
+plt.plot(X,y,label="y")
+plt.plot(X,h_1,label="$h_{1}(x)$")
+plt.legend()
+plt.show()
+gamma=1
+r=y-gamma*reg.predict(X.reshape(-1,1))
+def predict(y,weak_learners,gamma):
+    yhat=np.zeros(y.shape)
+    for h in weak_learners:
+        yhat+=h.predict(X.reshape(-1,1))
+    return yhat
+
+
+weak_learners =[]
+gamma=1
+r=y
+weak_learners.append(reg)
+for t_ in range(0,10):
+    #train weak learner 
+    reg=DecisionTreeRegressor(max_depth=1)
+    reg.fit(X.reshape(-1,1),r)
+    weak_learners.append(reg)
+    
+    #Calculate r_i,t for each iteration  
+    r=r-gamma*reg.predict(X.reshape(-1,1))
+    #plot function   
+    plt.plot(X,y,label="y")
+    plt.plot(X,predict (y,weak_learners,gamma),label="$H_{}(x)$".format(t_+1))
+    plt.legend()
+    plt.show()

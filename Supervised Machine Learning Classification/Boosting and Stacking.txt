@@ -1,0 +1,152 @@
+def warn(*args, **kwargs):
+    pass
+import warnings
+warnings.warn = warn
+
+import seaborn as sns, pandas as pd, numpy as np
+### BEGIN SOLUTION
+data = pd.read_csv("https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBM-ML241EN-SkillsNetwork/labs/datasets/Human_Activity_Recognition_Using_Smartphones_Data.csv", sep=',')
+data.shape
+data.dtypes.value_counts()
+# Mask to select float columns
+float_columns = (data.dtypes == np.float)
+
+# Verify that the maximum of all float columns is 1.0
+print( (data.loc[:,float_columns].max()==1.0).all() )
+
+# Verify that the minimum of all float columns is -1.0
+print( (data.loc[:,float_columns].min()==-1.0).all() )
+### END SOLUTION
+### BEGIN SOLUTION
+from sklearn.preprocessing import LabelEncoder
+
+le = LabelEncoder()
+
+data['Activity'] = le.fit_transform(data['Activity'])
+
+le.classes_
+data.Activity.unique()
+from sklearn.model_selection import train_test_split
+
+# Alternatively, we could stratify the categories in the split, as was done previously
+feature_columns = [x for x in data.columns if x != 'Activity']
+
+X_train, X_test, y_train, y_test = train_test_split(data[feature_columns], data['Activity'],
+                 test_size=0.3, random_state=42)
+
+X_train.shape, y_train.shape, X_test.shape, y_test.shape
+### END SOLUTION
+### BEGIN SOLUTION
+from sklearn.ensemble import GradientBoostingClassifier
+from sklearn.metrics import accuracy_score
+
+error_list = list()
+
+# Iterate through various possibilities for number of trees
+tree_list = [15, 25, 50, 100, 200, 400]
+for n_trees in tree_list:
+    
+    # Initialize the gradient boost classifier
+    GBC = GradientBoostingClassifier(n_estimators=n_trees, random_state=42)
+
+    # Fit the model
+    print(f'Fitting model with {n_trees} trees')
+    GBC.fit(X_train.values, y_train.values)
+    y_pred = GBC.predict(X_test)
+
+    # Get the error
+    error = 1.0 - accuracy_score(y_test, y_pred)
+    
+    # Store it
+    error_list.append(pd.Series({'n_trees': n_trees, 'error': error}))
+
+error_df = pd.concat(error_list, axis=1).T.set_index('n_trees')
+
+error_df
+sns.set_context('talk')
+sns.set_style('white')
+
+# Create the plot
+ax = error_df.plot(marker='o', figsize=(12, 8), linewidth=5)
+
+# Set parameters
+ax.set(xlabel='Number of Trees', ylabel='Error')
+ax.set_xlim(0, max(error_df.index)*1.1);
+### END SOLUTION
+### BEGIN SOLUTION
+from sklearn.model_selection import GridSearchCV
+
+# The parameters to be fit
+param_grid = {'n_estimators': tree_list,
+              'learning_rate': [0.1, 0.01, 0.001, 0.0001],
+              'subsample': [1.0, 0.5],
+              'max_features': [1, 2, 3, 4]}
+
+# The grid search object
+GV_GBC = GridSearchCV(GradientBoostingClassifier(random_state=42), 
+                      param_grid=param_grid, 
+                      scoring='accuracy',
+                      n_jobs=-1)
+
+# Do the grid search
+GV_GBC = GV_GBC.fit(X_train, y_train)
+# The best model
+GV_GBC.best_estimator_
+from sklearn.metrics import classification_report
+
+y_pred = GV_GBC.predict(X_test)
+print(classification_report(y_pred, y_test))
+from sklearn.metrics import confusion_matrix
+
+sns.set_context('talk')
+cm = confusion_matrix(y_test, y_pred)
+ax = sns.heatmap(cm, annot=True, fmt='d')
+### END SOLUTION
+### BEGIN SOLUTION
+from sklearn.ensemble import AdaBoostClassifier
+from sklearn.tree import DecisionTreeClassifier
+
+ABC = AdaBoostClassifier(DecisionTreeClassifier(max_depth=1))
+
+param_grid = {'n_estimators': [100, 150, 200],
+              'learning_rate': [0.01, 0.001]}
+
+GV_ABC = GridSearchCV(ABC,
+                      param_grid=param_grid, 
+                      scoring='accuracy',
+                      n_jobs=-1)
+
+GV_ABC = GV_ABC.fit(X_train, y_train)
+# The best model
+GV_ABC.best_estimator_
+y_pred = GV_ABC.predict(X_test)
+print(classification_report(y_pred, y_test))
+sns.set_context('talk')
+cm = confusion_matrix(y_test, y_pred)
+ax = sns.heatmap(cm, annot=True, fmt='d')
+### END SOLUTION
+### BEGIN SOLUTION
+from sklearn.linear_model import LogisticRegression
+
+# L2 regularized logistic regression
+LR_L2 = LogisticRegression(penalty='l2', max_iter=500, solver='saga').fit(X_train, y_train)
+y_pred = LR_L2.predict(X_test)
+print(classification_report(y_pred, y_test))
+sns.set_context('talk')
+cm = confusion_matrix(y_test, y_pred)
+ax = sns.heatmap(cm, annot=True, fmt='d')
+from sklearn.ensemble import VotingClassifier
+
+# The combined model--logistic regression and gradient boosted trees
+estimators = [('LR_L2', LR_L2), ('GBC', GV_GBC)]
+
+# Though it wasn't done here, it is often desirable to train 
+# this model using an additional hold-out data set and/or with cross validation
+VC = VotingClassifier(estimators, voting='soft')
+VC = VC.fit(X_train, y_train)
+y_pred = VC.predict(X_test)
+print(classification_report(y_test, y_pred))
+sns.set_context('talk')
+cm = confusion_matrix(y_test, y_pred)
+ax = sns.heatmap(cm, annot=True, fmt='d')
+### END SOLUTION

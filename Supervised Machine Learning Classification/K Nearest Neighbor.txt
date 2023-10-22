@@ -1,0 +1,70 @@
+# All Libraries required for this lab are listed below. The libraries pre-installed on Skills Network Labs are commented.
+# !mamba install -qy pandas==1.3.3 numpy==1.21.2 ipywidgets==7.4.2 scipy==7.4.2 tqdm==4.62.3 matplotlib==3.5.0 seaborn==0.9.0
+# Note: If your environment doesn't support "!mamba install", use "!pip install".
+import pandas as pd
+import numpy as np
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.model_selection import train_test_split
+from sklearn import metrics
+# Evaluation metrics related methods
+from sklearn.metrics import classification_report, accuracy_score, f1_score, confusion_matrix, precision_recall_fscore_support, precision_score, recall_score
+import matplotlib.pyplot as plt
+import seaborn as sns
+%matplotlib inline
+# Define a random seed to reproduce any random process
+rs = 123
+# Ignore any deprecation warnings
+import warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning) 
+# Read datast in csv format
+dataset_url = "https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBM-ML241EN-SkillsNetwork/labs/datasets/tumor.csv"
+tumor_df = pd.read_csv(dataset_url)
+tumor_df.head()
+tumor_df.columns
+X = tumor_df.iloc[:, :-1]
+y = tumor_df.iloc[:, -1:]
+X.describe()
+y.value_counts(normalize=True)
+y.value_counts().plot.bar(color=['green', 'red'])
+# Split 80% as training dataset
+# and 20% as testing dataset
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state = rs)
+# Define a KNN classifier with `n_neighbors=2`
+knn_model = KNeighborsClassifier(n_neighbors=2)
+knn_model.fit(X_train, y_train.values.ravel())
+preds = knn_model.predict(X_test)
+def evaluate_metrics(yt, yp):
+    results_pos = {}
+    results_pos['accuracy'] = accuracy_score(yt, yp)
+    precision, recall, f_beta, _ = precision_recall_fscore_support(yt, yp, average='binary')
+    results_pos['recall'] = recall
+    results_pos['precision'] = precision
+    results_pos['f1score'] = f_beta
+    return results_pos
+evaluate_metrics(y_test, preds)
+model = KNeighborsClassifier(n_neighbors=5)
+model.fit(X_train, y_train.values.ravel())
+preds = model.predict(X_test)
+evaluate_metrics(y_test, preds)
+# Try K from 1 to 50
+max_k = 50
+# Create an empty list to store f1score for each k
+f1_scores = []
+for k in range(1, max_k + 1):
+    # Create a KNN classifier
+    knn = KNeighborsClassifier(n_neighbors=k)
+    # Train the classifier
+    knn = knn.fit(X_train, y_train.values.ravel())
+    preds = knn.predict(X_test)
+    # Evaluate the classifier with f1score
+    f1 = f1_score(preds, y_test)
+    f1_scores.append((k, round(f1_score(y_test, preds), 4)))
+# Convert the f1score list to a dataframe
+f1_results = pd.DataFrame(f1_scores, columns=['K', 'F1 Score'])
+f1_results.set_index('K')
+# Plot F1 results
+ax = f1_results.plot(figsize=(12, 12))
+ax.set(xlabel='Num of Neighbors', ylabel='F1 Score')
+ax.set_xticks(range(1, max_k, 2));
+plt.ylim((0.85, 1))
+plt.title('KNN F1 Score')

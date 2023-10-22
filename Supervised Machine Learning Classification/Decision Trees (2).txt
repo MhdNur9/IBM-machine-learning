@@ -1,0 +1,148 @@
+def warn(*args, **kwargs):
+    pass
+import warnings
+warnings.warn = warn
+
+import pandas as pd, numpy as np, matplotlib.pyplot as plt, seaborn as sns
+### BEGIN SOLUTION
+data = pd.read_csv("https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBM-ML241EN-SkillsNetwork/labs/datasets/Wine_Quality_Data.csv", sep=',')
+data.head()
+data.dtypes
+data['color'] = data.color.replace('white',0).replace('red',1).astype(np.int)
+### END SOLUTION
+### BEGIN SOLUTION
+# All data columns except for color
+feature_cols = [x for x in data.columns if x not in 'color']
+from sklearn.model_selection import StratifiedShuffleSplit
+
+# Split the data into two parts with 1000 points in the test data
+# This creates a generator
+strat_shuff_split = StratifiedShuffleSplit(n_splits=1, test_size=1000, random_state=42)
+
+# Get the index values from the generator
+train_idx, test_idx = next(strat_shuff_split.split(data[feature_cols], data['color']))
+
+# Create the data sets
+X_train = data.loc[train_idx, feature_cols]
+y_train = data.loc[train_idx, 'color']
+
+X_test = data.loc[test_idx, feature_cols]
+y_test = data.loc[test_idx, 'color']
+y_train.value_counts(normalize=True).sort_index()
+y_test.value_counts(normalize=True).sort_index()
+### END SOLUTION
+### BEGIN SOLUTION
+from sklearn.tree import DecisionTreeClassifier
+
+dt = DecisionTreeClassifier(random_state=42)
+dt = dt.fit(X_train, y_train)
+dt.tree_.node_count, dt.tree_.max_depth
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+
+def measure_error(y_true, y_pred, label):
+    return pd.Series({'accuracy':accuracy_score(y_true, y_pred),
+                      'precision': precision_score(y_true, y_pred),
+                      'recall': recall_score(y_true, y_pred),
+                      'f1': f1_score(y_true, y_pred)},
+                      name=label)
+# The error on the training and test data sets
+y_train_pred = dt.predict(X_train)
+y_test_pred = dt.predict(X_test)
+
+train_test_full_error = pd.concat([measure_error(y_train, y_train_pred, 'train'),
+                              measure_error(y_test, y_test_pred, 'test')],
+                              axis=1)
+
+train_test_full_error
+### END SOLUTION
+### BEGIN SOLUTION
+from sklearn.model_selection import GridSearchCV
+
+param_grid = {'max_depth':range(1, dt.tree_.max_depth+1, 2),
+              'max_features': range(1, len(dt.feature_importances_)+1)}
+
+GR = GridSearchCV(DecisionTreeClassifier(random_state=42),
+                  param_grid=param_grid,
+                  scoring='accuracy',
+                  n_jobs=-1)
+
+GR = GR.fit(X_train, y_train)
+GR.best_estimator_.tree_.node_count, GR.best_estimator_.tree_.max_depth
+y_train_pred_gr = GR.predict(X_train)
+y_test_pred_gr = GR.predict(X_test)
+
+train_test_gr_error = pd.concat([measure_error(y_train, y_train_pred_gr, 'train'),
+                                 measure_error(y_test, y_test_pred_gr, 'test')],
+                                axis=1)
+train_test_gr_error
+### END SOLUTION
+### BEGIN SOLUTION
+feature_cols = [x for x in data.columns if x != 'residual_sugar']
+
+# Create the data sets
+X_train = data.loc[train_idx, feature_cols]
+y_train = data.loc[train_idx, 'residual_sugar']
+
+X_test = data.loc[test_idx, feature_cols]
+y_test = data.loc[test_idx, 'residual_sugar']
+from sklearn.tree import DecisionTreeRegressor
+
+dr = DecisionTreeRegressor().fit(X_train, y_train)
+
+param_grid = {'max_depth':range(1, dr.tree_.max_depth+1, 2),
+              'max_features': range(1, len(dr.feature_importances_)+1)}
+
+GR_sugar = GridSearchCV(DecisionTreeRegressor(random_state=42),
+                     param_grid=param_grid,
+                     scoring='neg_mean_squared_error',
+                      n_jobs=-1)
+
+GR_sugar = GR_sugar.fit(X_train, y_train)
+GR_sugar.best_estimator_.tree_.node_count, GR_sugar.best_estimator_.tree_.max_depth
+from sklearn.metrics import mean_squared_error
+
+y_train_pred_gr_sugar = GR_sugar.predict(X_train)
+y_test_pred_gr_sugar  = GR_sugar.predict(X_test)
+
+train_test_gr_sugar_error = pd.Series({'train': mean_squared_error(y_train, y_train_pred_gr_sugar),
+                                         'test':  mean_squared_error(y_test, y_test_pred_gr_sugar)},
+                                          name='MSE').to_frame().T
+
+train_test_gr_sugar_error
+sns.set_context('notebook')
+sns.set_style('white')
+fig = plt.figure(figsize=(6,6))
+ax = plt.axes()
+
+ph_test_predict = pd.DataFrame({'test':y_test.values,
+                                'predict': y_test_pred_gr_sugar}).set_index('test').sort_index()
+
+ph_test_predict.plot(marker='o', ls='', ax=ax)
+ax.set(xlabel='Test', ylabel='Predict', xlim=(0,35), ylim=(0,35));
+### END SOLUTION
+from io import StringIO
+from IPython.display import Image
+from sklearn.tree import export_graphviz
+import pydotplus
+### BEGIN SOLUTION
+# Create an output destination for the file
+dot_data = StringIO()
+
+export_graphviz(dt, out_file=dot_data, filled=True)
+graph = pydotplus.graph_from_dot_data(dot_data.getvalue())
+
+# View the tree image
+filename = 'wine_tree.png'
+graph.write_png(filename)
+Image(filename=filename)
+# Create an output destination for the file
+dot_data = StringIO()
+
+export_graphviz(GR.best_estimator_, out_file=dot_data, filled=True)
+graph = pydotplus.graph_from_dot_data(dot_data.getvalue())
+
+# View the tree image
+filename = 'wine_tree_prune.png'
+graph.write_png(filename)
+Image(filename=filename) 
+### END SOLUTION

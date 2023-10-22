@@ -1,0 +1,188 @@
+# All Libraries required for this lab are listed below. The libraries pre-installed on Skills Network Labs are commented.
+# !mamba install -qy pandas==1.3.3 numpy==1.21.2 ipywidgets==7.4.2 scipy==7.4.2 tqdm==4.62.3 matplotlib==3.5.0 seaborn==0.9.0
+# Note: If your environment doesn't support "!mamba install", use "!pip install" 
+# Library for reading in data and using dataframes
+import pandas as pd
+# Using numpy arrays
+import numpy as np
+# Data preprocessing functions like LabelEncoder
+from sklearn import preprocessing
+%matplotlib inline
+# Visualizations
+import matplotlib.pyplot as plt
+# Model accuracy
+from sklearn import metrics
+# Surpress numpy data type warnings
+import warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning) 
+# Give loops a progress bar
+from tqdm import tqdm
+def get_accuracy(X_train, X_test, y_train, y_test, model):
+    return  {"test Accuracy":metrics.accuracy_score(y_test, model.predict(X_test)),"train Accuracy": metrics.accuracy_score(y_train, model.predict(X_train))}
+# Plot tree helper libraries
+from  io import StringIO
+import pydotplus
+import matplotlib.image as mpimg
+from sklearn import tree
+
+
+def plot_tree(model,filename = "tree.png"):
+    #global churn_df 
+
+    dot_data = StringIO()
+  
+
+    featureNames = [colunm  for colunm in churn_df[['tenure', 'age', 'address', 'income', 'ed', 'employ', 'equip']].columns]
+    out=tree.export_graphviz(model,feature_names=featureNames, out_file=dot_data, class_names= ['left','stay'], filled=True,  special_characters=True,rotate=False)  
+    graph = pydotplus.graph_from_dot_data(dot_data.getvalue())  
+    graph.write_png(filename)
+    img = mpimg.imread(filename)
+    plt.figure(figsize=(100, 200))
+    plt.imshow(img,interpolation='nearest')
+def get_accuracy_bag(X,y,title,times=20,xlabel='Number Estimators'):
+    #Iterate through different number of estimators and average out the results  
+
+
+    N_estimators=[n for n in range(1,70)]
+    times=20
+    train_acc=np.zeros((times,len(N_estimators)))
+    test_acc=np.zeros((times,len(N_estimators)))
+    
+    train_time=np.zeros((times,len(N_estimators)))
+    test_time=np.zeros((times,len(N_estimators)))
+     #average out the results
+    for n in tqdm(range(times)):
+        X_train, X_test, y_train, y_test = train_test_split( X, y, test_size=0.3)
+        for n_estimators in N_estimators:
+            #Iterate through different number of estimators and average out the results   
+        
+            Bag= BaggingClassifier(base_estimator=DecisionTreeClassifier(criterion="entropy", max_depth = 10),n_estimators=n_estimators,bootstrap=True,random_state=0)
+            Bag.fit(X_train,y_train)
+          
+            
+             
+            Accuracy=get_accuracy(X_train, X_test, y_train, y_test,  Bag)
+           
+            
+            
+  
+            train_acc[n,n_estimators-1]=Accuracy['train Accuracy']
+            test_acc[n,n_estimators-1]=Accuracy['test Accuracy']
+        
+        
+        
+    fig, ax1 = plt.subplots()
+
+    ax2 = ax1.twinx()
+    ax1.plot(train_acc.mean(axis=0))
+    ax2.plot(test_acc.mean(axis=0),c='r')
+    ax1.set_xlabel(xlabel)
+    ax1.set_ylabel('Training accuracy',color='b')
+    ax2.set_ylabel('Testing accuracy', color='r')
+    plt.title(title)
+    plt.show()
+    
+   
+churn_df = pd.read_csv("https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBMDeveloperSkillsNetwork-ML0101EN-SkillsNetwork/labs/Module%203/data/ChurnData.csv")
+
+churn_df.head()
+churn_df = churn_df[['tenure', 'age', 'address', 'income', 'ed', 'employ', 'equip',   'callcard', 'wireless','churn']]
+churn_df['churn'] = churn_df['churn'].astype('int')
+churn_df.head()
+print(churn_df.shape)
+
+print(churn_df.columns)
+from sklearn.utils import resample
+churn_df[0:5]
+resample(churn_df[0:5])
+resample(churn_df[0:5])
+X = churn_df[['tenure', 'age', 'address', 'income', 'ed', 'employ', 'equip']]
+
+X.head()
+y = churn_df['churn']
+y.head()
+from sklearn.model_selection import train_test_split
+X_train, X_test, y_train, y_test = train_test_split( X, y, test_size=0.3, random_state=0)
+print ('Train set', X_train.shape,  y_train.shape)
+print ('Test set', X_test.shape,  y_test.shape)
+from sklearn.tree import DecisionTreeClassifier
+from sklearn import tree
+max_depth=5
+X_train, X_test, y_train, y_test = train_test_split( X, y, test_size=0.3, random_state=10)
+Tree = DecisionTreeClassifier(criterion="entropy", max_depth = max_depth,random_state=10)
+Tree
+Tree.fit(X_train,y_train)
+yhat = Tree.predict(X_test)
+yhat
+get_accuracy(X_train, X_test, y_train, y_test,  Tree)
+plot_tree(filename = "tree.png",model=Tree)
+X_train, X_test, y_train, y_test = train_test_split( X, y, test_size=0.3, random_state=5)
+Tree = DecisionTreeClassifier(criterion="entropy", max_depth = max_depth,random_state=8)
+Tree.fit(X_train,y_train)
+print(get_accuracy(X_train, X_test, y_train, y_test,  Tree))
+plot_tree(filename = "tree1.png",model=Tree)
+from sklearn.ensemble import BaggingClassifier
+Bag = BaggingClassifier(base_estimator=DecisionTreeClassifier(criterion="entropy", max_depth = 4,random_state=2),n_estimators=30,random_state=0,bootstrap=True)
+Bag.fit(X_train,y_train)
+Bag.predict(X_test)
+print(get_accuracy(X_train, X_test, y_train, y_test,  Bag))
+get_accuracy_bag(X, y, "Customer Churn")
+from sklearn.svm import SVC
+
+clf=SVC(kernel='linear',gamma='scale')
+clf.fit(X_train, y_train) 
+print(get_accuracy(X_train, X_test, y_train, y_test,  clf))
+Bag = BaggingClassifier(base_estimator=SVC(kernel='linear',gamma='scale'),n_estimators=10,random_state=0,bootstrap=True)
+Bag.fit(X_train,y_train)
+print(get_accuracy(X_train, X_test, y_train, y_test,  Bag))
+df = pd.read_csv("https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBMDeveloperSkillsNetwork-ML0101EN-SkillsNetwork/labs/Module%203/data/cell_samples.csv")
+
+df.head()
+df = df[df["BareNuc"] != "?"]
+X =  df[['Clump', 'UnifSize', 'UnifShape', 'MargAdh', 'SingEpiSize', 'BareNuc', 'BlandChrom', 'NormNucl', 'Mit']]
+
+X.head()
+y = df['Class']
+
+y.head()
+X_train, X_test, y_train, y_test = train_test_split( X, y, test_size=0.2, random_state=4)
+print ('Train set:', X_train.shape,  y_train.shape)
+print ('Test set:', X_test.shape,  y_test.shape)
+from sklearn.model_selection import GridSearchCV
+param_grid = {'n_estimators': [2*n+1 for n in range(20)],
+     'base_estimator__max_depth' : [2*n+1 for n in range(10) ] }
+Bag = BaggingClassifier(base_estimator = DecisionTreeClassifier(), random_state=0, bootstrap=True)
+search = GridSearchCV(estimator=Bag, param_grid=param_grid, scoring='accuracy', cv=3)
+search.fit(X_train, y_train)
+search.best_score_
+search.best_params_
+print(get_accuracy(X_train, X_test, y_train, y_test, search.best_estimator_))
+get_accuracy_bag(X, y, "Cancer Data")
+df = pd.read_csv("https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBMDeveloperSkillsNetwork-ML0101EN-SkillsNetwork/labs/Module%203/data/drug200.csv", delimiter=",")
+df.head()
+X = df[['Age', 'Sex', 'BP', 'Cholesterol', 'Na_to_K']].values
+X[0:5]
+y = df["Drug"]
+y[0:5]
+le_sex = preprocessing.LabelEncoder()
+le_sex.fit(['F','M'])
+X[:,1] = le_sex.transform(X[:,1]) 
+le_BP = preprocessing.LabelEncoder()
+le_BP.fit([ 'LOW', 'NORMAL', 'HIGH'])
+X[:,2] = le_BP.transform(X[:,2])
+le_Chol = preprocessing.LabelEncoder()
+le_Chol.fit([ 'NORMAL', 'HIGH'])
+X[:,3] = le_Chol.transform(X[:,3]) 
+X[0:5]
+X_train, X_test, y_train, y_test = train_test_split( X, y, test_size=0.2, random_state=4)
+print ('Train set:', X_train.shape,  y_train.shape)
+print ('Test set:', X_test.shape,  y_test.shape)
+param_grid = {'n_estimators': [2*n+1 for n in range(20)],
+     'base_estimator__max_depth' : [2*n+1 for n in range(10) ]}
+Bag = BaggingClassifier(base_estimator=DecisionTreeClassifier(),random_state=0,bootstrap=True)
+search = GridSearchCV(estimator=Bag, param_grid=param_grid,scoring='accuracy', cv=3)
+search.fit(X_train, y_train)
+search.best_score_
+search.best_params_
+print(get_accuracy(X_train, X_test, y_train, y_test, search.best_estimator_))
+get_accuracy_bag(X, y, "Drug Data")

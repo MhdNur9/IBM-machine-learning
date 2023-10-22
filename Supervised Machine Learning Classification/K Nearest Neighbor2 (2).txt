@@ -1,0 +1,129 @@
+def warn(*args, **kwargs):
+    pass
+import warnings
+warnings.warn = warn
+
+import pandas as pd, numpy as np, matplotlib.pyplot as plt, os, sys, seaborn as sns
+### BEGIN SOLUTION
+
+df = pd.read_csv("https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBM-ML241EN-SkillsNetwork/labs/datasets/churndata_processed.csv")
+round(df.describe(),2)
+### BEGIN SOLUTION
+df_uniques = pd.DataFrame([[i, len(df[i].unique())] for i in df.columns], columns=['Variable', 'Unique Values']).set_index('Variable')
+df_uniques
+binary_variables = list(df_uniques[df_uniques['Unique Values'] == 2].index)
+binary_variables
+categorical_variables = list(df_uniques[(6 >= df_uniques['Unique Values']) & (df_uniques['Unique Values'] > 2)].index)
+categorical_variables
+[[i, list(df[i].unique())] for i in categorical_variables]
+ordinal_variables = ['contract', 'satisfaction']
+df['months'].unique()
+ordinal_variables.append('months')
+numeric_variables = list(set(df.columns) - set(ordinal_variables) - set(categorical_variables) - set(binary_variables))
+df[numeric_variables].hist(figsize=(12, 6))
+df['months'] = pd.cut(df['months'], bins=5)
+### END SOLUTION
+### BEGIN SOLUTION
+from sklearn.preprocessing import LabelBinarizer, LabelEncoder, OrdinalEncoder
+lb, le = LabelBinarizer(), LabelEncoder()
+for column in ordinal_variables:
+    df[column] = le.fit_transform(df[column])
+df[ordinal_variables].astype('category').describe()
+for column in binary_variables:
+    df[column] = lb.fit_transform(df[column])
+categorical_variables = list(set(categorical_variables) - set(ordinal_variables))
+df = pd.get_dummies(df, columns = categorical_variables, drop_first=True)
+df.describe().T
+from sklearn.preprocessing import MinMaxScaler
+mm = MinMaxScaler()
+for column in [ordinal_variables + numeric_variables]:
+    df[column] = mm.fit_transform(df[column])
+round(df.describe().T, 3)
+### END SOLUTION
+
+# Save a copy of the processed data for later use
+outputfile = 'churndata_processed.csv'
+df.to_csv(outputfile, index=False)
+### BEGIN SOLUTION
+from sklearn.model_selection import train_test_split
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.metrics import confusion_matrix, accuracy_score, classification_report, f1_score
+# Set up X and y variables
+y, X = df['churn_value'], df.drop(columns='churn_value')
+# Split the data into training and test samples
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.4, random_state=42)
+# Estimate KNN model and report outcomes
+knn = KNeighborsClassifier(n_neighbors=3)
+knn = knn.fit(X_train, y_train)
+y_pred = knn.predict(X_test)
+# Preciision, recall, f-score from the multi-class support function
+print(classification_report(y_test, y_pred))
+print('Accuracy score: ', round(accuracy_score(y_test, y_pred), 2))
+print('F1 Score: ', round(f1_score(y_test, y_pred), 2))
+# Plot confusion matrix
+sns.set_palette(sns.color_palette())
+_, ax = plt.subplots(figsize=(12,12))
+ax = sns.heatmap(confusion_matrix(y_test, y_pred), annot=True, fmt='d', annot_kws={"size": 40, "weight": "bold"})  
+labels = ['False', 'True']
+ax.set_xticklabels(labels, fontsize=25);
+ax.set_yticklabels(labels[::-1], fontsize=25);
+ax.set_ylabel('Prediction', fontsize=30);
+ax.set_xlabel('Ground Truth', fontsize=30)
+### END SOLUTION
+### BEGIN SOLUTION
+knn = KNeighborsClassifier(n_neighbors=5, weights='distance')
+knn = knn.fit(X_train, y_train)
+y_pred = knn.predict(X_test)
+# Preciision, recall, f-score from the multi-class support function
+print(classification_report(y_test, y_pred))
+print('Accuracy score: ', round(accuracy_score(y_test, y_pred), 2))
+print('F1 Score: ', round(f1_score(y_test, y_pred), 2))
+# Plot confusion matrix
+_, ax = plt.subplots(figsize=(12,12))
+ax = sns.heatmap(confusion_matrix(y_test, y_pred), annot=True, fmt='d', annot_kws={"size": 40, "weight": "bold"})  
+labels = ['False', 'True']
+ax.set_xticklabels(labels, fontsize=25);
+ax.set_yticklabels(labels[::-1], fontsize=25);
+ax.set_ylabel('Prediction', fontsize=30);
+ax.set_xlabel('Ground Truth', fontsize=30)
+### END SOLUTION
+### BEGIN SOLUTION
+max_k = 40
+f1_scores = list()
+error_rates = list() # 1-accuracy
+
+for k in range(1, max_k):
+    
+    knn = KNeighborsClassifier(n_neighbors=k, weights='distance')
+    knn = knn.fit(X_train, y_train)
+    
+    y_pred = knn.predict(X_test)
+    f1 = f1_score(y_pred, y_test)
+    f1_scores.append((k, round(f1_score(y_test, y_pred), 4)))
+    error = 1-round(accuracy_score(y_test, y_pred), 4)
+    error_rates.append((k, error))
+    
+f1_results = pd.DataFrame(f1_scores, columns=['K', 'F1 Score'])
+error_results = pd.DataFrame(error_rates, columns=['K', 'Error Rate'])
+
+# Plot F1 results
+sns.set_context('talk')
+sns.set_style('ticks')
+
+plt.figure(dpi=300)
+ax = f1_results.set_index('K').plot(figsize=(12, 12), linewidth=6)
+ax.set(xlabel='K', ylabel='F1 Score')
+ax.set_xticks(range(1, max_k, 2));
+plt.title('KNN F1 Score')
+plt.savefig('knn_f1.png')
+# Plot Accuracy (Error Rate) results
+sns.set_context('talk')
+sns.set_style('ticks')
+
+plt.figure(dpi=300)
+ax = error_results.set_index('K').plot(figsize=(12, 12), linewidth=6)
+ax.set(xlabel='K', ylabel='Error Rate')
+ax.set_xticks(range(1, max_k, 2))
+plt.title('KNN Elbow Curve')
+plt.savefig('knn_elbow.png')
+### END SOLUTION

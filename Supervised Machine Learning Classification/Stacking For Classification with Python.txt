@@ -1,0 +1,106 @@
+# All Libraries required for this lab are listed below. The libraries, pre-installed on Skills Network Labs are commented.
+# !mamba install -qy pandas==1.3.3 numpy==1.21.2 ipywidgets==7.4.2 scipy==7.4.2 tqdm==4.62.3 matplotlib==3.5.0 seaborn==0.9.0
+
+# You will need scikit-learn>=0.22.0 as StackingClassifier does not exist in version <0.22.0
+!mamba install -c conda-forge -qy scikit-learn=0.22.1
+
+# Note: If your environment doesn't support "!mamba install", use "!pip install"
+import pandas as pd
+# import pylab as plt
+import numpy as np
+import scipy.optimize as opt
+from sklearn import preprocessing
+import matplotlib.pyplot as plt
+%matplotlib inline
+from sklearn import metrics
+from sklearn.model_selection import GridSearchCV
+import seaborn as sns
+from sklearn import preprocessing
+from sklearn.ensemble import StackingClassifier
+from sklearn.svm import SVC
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.linear_model import LogisticRegression
+import warnings
+warnings.filterwarnings('ignore')
+def get_accuracy(X_train, X_test, y_train, y_test, model):
+    return  {"test Accuracy":metrics.accuracy_score(y_test, model.predict(X_test)),"trian Accuracy": metrics.accuracy_score(y_train, model.predict(X_train))}
+df = pd.read_csv("https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBM-ML241EN-SkillsNetwork/labs/datasets/wine.data",names= ['Class', 'Alcohol', 'Malic acid', 'Ash',
+         'Alcalinity of ash' ,'Magnesium', 'Total phenols',
+         'Flavanoids', 'Nonflavanoid phenols', 'Proanthocyanins',     'Color intensity', 'Hue', 'OD280/OD315 of diluted wines',
+         'Proline'])
+
+df.head()
+df.dtypes
+df['Class'].unique()
+colormap = plt.cm.RdBu
+plt.figure(figsize=(14,12))
+plt.title('Pearson Correlation of Features', y=1.05, size=15)
+sns.heatmap(df.astype(float).corr(),linewidths=0.1,vmax=1.0, 
+            square=True, cmap=colormap, linecolor='white', annot=True)
+plt.show()
+# May need to specify bandwidth (bw) in order to plot, else can delete the `, diag_kws={'bw': 0.2})` code.
+sns.pairplot(df, hue="Class", diag_kws={'bw': 0.2})
+features=list(df)
+features[1:]
+y,X=df[features[0]] ,df[features[1:]]
+scaler = preprocessing.StandardScaler().fit(X)
+X= scaler.transform(X)
+X.mean(axis=0)
+X.std(axis=0)
+from sklearn.model_selection import train_test_split
+X_train, X_test, y_train, y_test = train_test_split( X, y, test_size=0.3, random_state=1)
+print ('Train set', X_train.shape,  y_train.shape)
+print ('Test set', X_test.shape,  y_test.shape)
+estimators = [('SVM',SVC(random_state=42)),('KNN',KNeighborsClassifier()),('dt',DecisionTreeClassifier())]
+estimators
+clf = StackingClassifier( estimators=estimators, final_estimator= LogisticRegression())
+clf.fit(X_train, y_train)
+clf
+yhat=clf.predict(X_test)
+yhat
+get_accuracy(X_train, X_test, y_train, y_test, clf)
+estimators = [('SVM',SVC(random_state=42)),('KNN',KNeighborsClassifier()),('lr',LogisticRegression())]
+clf = StackingClassifier( estimators=estimators, final_estimator= DecisionTreeClassifier())
+clf.fit(X_train, y_train)
+
+get_accuracy(X_train, X_test, y_train, y_test, clf)
+df = pd.read_csv("https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBMDeveloperSkillsNetwork-ML0101EN-SkillsNetwork/labs/Module%203/data/drug200.csv", delimiter=",")
+df.head()
+X = df[['Age', 'Sex', 'BP', 'Cholesterol', 'Na_to_K']].values
+X[0:5]
+y = df["Drug"]
+y[0:5]
+from sklearn import preprocessing
+le_sex = preprocessing.LabelEncoder()
+le_sex.fit(['F','M'])
+X[:,1] = le_sex.transform(X[:,1]) 
+
+
+le_BP = preprocessing.LabelEncoder()
+le_BP.fit([ 'LOW', 'NORMAL', 'HIGH'])
+X[:,2] = le_BP.transform(X[:,2])
+
+
+le_Chol = preprocessing.LabelEncoder()
+le_Chol.fit([ 'NORMAL', 'HIGH'])
+X[:,3] = le_Chol.transform(X[:,3]) 
+
+X[0:5]
+scaler = preprocessing.StandardScaler().fit(X)
+X= scaler.transform(X)
+X_train, X_test, y_train, y_test = train_test_split( X, y, test_size=0.3, random_state=4)
+print ('Train set:', X_train.shape,  y_train.shape)
+print ('Test set:', X_test.shape,  y_test.shape)
+estimators = [('SVM',SVC(random_state=42)),('knn',KNeighborsClassifier()),('dt',DecisionTreeClassifier())]
+estimators
+clf = StackingClassifier( estimators=estimators, final_estimator= LogisticRegression())
+clf
+param_grid = {'dt__max_depth': [n for n in range(10)],'dt__random_state':[0],'SVM__C':[0.01,0.1,1],'SVM__kernel':['linear', 'poly', 'rbf'],'knn__n_neighbors':[1,4,8,9] }
+
+search = GridSearchCV(estimator=clf, param_grid=param_grid,scoring='accuracy')
+search.fit(X_train, y_train)
+search.best_score_
+search.best_params_
+get_accuracy(X_train, X_test, y_train, y_test, search)
+!mamba install -c conda-forge -qy scikit-learn=0.20.1

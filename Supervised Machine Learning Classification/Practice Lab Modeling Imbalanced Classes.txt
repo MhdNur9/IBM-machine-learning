@@ -1,0 +1,312 @@
+# All Libraries required for this lab are listed below. The libraries pre-installed on Skills Network Labs are commented.
+# !mamba install -qy pandas==1.3.3 numpy==1.21.2 ipywidgets==7.4.2 scipy==7.4.2 tqdm==4.62.3 matplotlib==3.5.0 seaborn==0.9.0
+
+# install imbalanced-learn package
+!pip install imbalanced-learn==0.8.0
+
+# Note: If your environment doesn't support "!mamba install", use "!pip install"
+## Import packages here
+import pandas as pd
+import numpy as np 
+import imblearn
+from matplotlib.pyplot import figure
+from sklearn.utils import shuffle
+from sklearn.preprocessing import OneHotEncoder, LabelEncoder
+from sklearn.impute import SimpleImputer, KNNImputer
+from sklearn.model_selection import train_test_split, learning_curve
+from sklearn.linear_model import LogisticRegression
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.metrics import classification_report, accuracy_score, precision_recall_fscore_support, confusion_matrix, plot_confusion_matrix, precision_score, recall_score, roc_auc_score
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+
+from imblearn.under_sampling import RandomUnderSampler
+from sklearn import metrics
+from sklearn.inspection import permutation_importance
+import matplotlib.pyplot as plt
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.model_selection import GridSearchCV
+from collections import Counter
+rs = 123
+# Grid search hyperparameters for a logistic regression model
+def grid_search_lr(X_train, y_train):
+    params_grid = {
+    'class_weight': [{0:0.05, 1:0.95}, {0:0.1, 1:0.9}, {0:0.2, 1:0.8}]
+    }
+    lr_model = LogisticRegression(random_state=rs, max_iter=1000)
+    grid_search = GridSearchCV(estimator = lr_model, 
+                           param_grid = params_grid, 
+                           scoring='f1',
+                           cv = 5, verbose = 1)
+    grid_search.fit(X_train, y_train)
+    best_params = grid_search.best_params_
+    return best_params
+
+# Grid search hyperparameters for a random forest model
+def grid_search_rf(X_train, y_train):
+    params_grid = {
+    'max_depth': [5, 10, 15, 20],
+    'n_estimators': [25, 50, 100],
+    'min_samples_split': [2, 5],
+    'class_weight': [{0:0.1, 1:0.9}, {0:0.2, 1:0.8}, {0:0.3, 1:0.7}]
+    }
+    rf_model = RandomForestClassifier(random_state=rs)
+    grid_search = GridSearchCV(estimator = rf_model, 
+                           param_grid = params_grid, 
+                           scoring='f1',
+                           cv = 5, verbose = 1)
+    grid_search.fit(X_train, y_train)
+    best_params = grid_search.best_params_
+    return best_params
+def split_data(df):
+    X = df.loc[ : , df.columns != 'Class']
+    y = df['Class'].astype('int')
+    return train_test_split(X, y, test_size=0.2, stratify=y, random_state = rs)
+credit_df = pd.read_csv("https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBM-ML201EN-SkillsNetwork/labs/module_4/datasets/im_credit.csv", index_col=False)
+credit_df.head()
+credit_df['Class'].value_counts()
+# Visualize the count for each class
+credit_df['Class'].value_counts().plot.bar(color=['green', 'red'])
+# Split the training and testing dataset
+X_train, X_test, y_train, y_test = split_data(credit_df)
+# Build a simple logistic regression model
+model = LogisticRegression(random_state=rs, 
+                              max_iter = 1000)
+
+# Train the model
+model.fit(X_train, y_train)
+preds = model.predict(X_test)
+accuracy_score(y_test, preds)
+# Calculate the precision, recall, f5 given the y_test and predictions
+# Note that we use beta=5 which means we think the cost of positive class is 5 times of negative class
+# You could try other beta values yourself
+accuracy = accuracy_score(y_test, preds)
+precision, recall, fbeta, support = precision_recall_fscore_support(y_test, preds, beta=5, pos_label=1, average='binary')
+auc = roc_auc_score(y_test, preds)
+print(f"Accuracy is: {accuracy:.2f}")
+print(f"Precision is: {precision:.2f}")
+print(f"Recall is: {recall:.2f}")
+print(f"Fscore is: {fbeta:.2f}")
+print(f"AUC is: {auc:.2f}")
+from imblearn.over_sampling import RandomOverSampler, SMOTE
+# Create a SMOTE sampler
+smote_sampler = SMOTE(random_state = rs)
+# Resample training data using SMOTE
+X_smo, y_smo = smote_sampler.fit_resample(X_train, y_train)
+# Visualize classes
+y_smo.value_counts().plot.bar(color=['green', 'red'])
+# Re-train the model with resampled data
+model.fit(X_smo, y_smo)
+preds = model.predict(X_test)
+# Calculate the precision, recall, f5 given the y_test and predictions
+# Note that we use beta=5 which means we think the cost of positive class is 5 times of negative class
+# You could try other beta values yourself
+precision, recall, f_beta, support = precision_recall_fscore_support(y_test, preds, beta=5, pos_label=1, average='binary')
+auc = roc_auc_score(y_test, preds)
+accuracy = accuracy_score(y_test, preds)
+print(f"Accuracy is: {accuracy:.2f}")
+print(f"Precision is: {precision:.2f}")
+print(f"Recall is: {recall:.2f}")
+print(f"Fscore is: {f_beta:.2f}")
+print(f"AUC is: {auc:.2f}")
+class_weight = {}
+
+# Assign weight of class 0 to be 0.1
+class_weight[0] = 0.1
+
+# Assign weight of class 1 to be 0.9
+class_weight[1] = 0.9
+# Define a logistic regression with weight
+model = LogisticRegression(random_state=rs, 
+                              max_iter = 1000,
+                              class_weight=class_weight)
+# Train the model
+model.fit(X_train, y_train)
+# Make predictions on the test dataset
+preds = model.predict(X_test)
+# Calculate the precision, recall, f5 given the y_test and predictions
+# Note that we use beta=5 which means we think the cost of positive class is 5 times of negative class
+# You could try other beta values yourself
+precision, recall, f_beta, support = precision_recall_fscore_support(y_test, preds, beta=5, pos_label=1, average='binary')
+auc = roc_auc_score(y_test, preds)
+accuracy = accuracy_score(y_test, preds)
+print(f"Accuracy is: {accuracy:.2f}")
+print(f"Precision is: {precision:.2f}")
+print(f"Recall is: {recall:.2f}")
+print(f"Fscore is: {f_beta:.2f}")
+print(f"AUC is: {auc:.2f}")
+rs = 123
+# Build a logistic regression model
+def build_lr(X_train, y_train, X_test, threshold=0.5, best_params=None):
+    
+    model = LogisticRegression(random_state=rs, 
+                              max_iter = 1000)
+    # If best parameters are provided
+    if best_params:
+        model = LogisticRegression(penalty = 'l2',
+                              random_state=rs, 
+                              max_iter = 1000,
+                              class_weight=best_params['class_weight'])
+    # Train the model
+    model.fit(X_train, y_train)
+    # If predicted probability is largr than threshold (default value is 0.5), generate a positive label
+    predicted_proba = model.predict_proba(X_test)
+    yp = (predicted_proba [:,1] >= threshold).astype('int')
+    return yp, model
+def build_rf(X_train, y_train, X_test, threshold=0.5, best_params=None):
+    
+    model = RandomForestClassifier(random_state = rs)
+    # If best parameters are provided
+    if best_params:
+        model = RandomForestClassifier(random_state = rs,
+                                   # If bootstrap sampling is used
+                                   bootstrap = best_params['bootstrap'],
+                                   # Max depth of each tree
+                                   max_depth = best_params['max_depth'],
+                                   # Class weight parameters
+                                   class_weight=best_params['class_weight'],
+                                   # Number of trees
+                                   n_estimators=best_params['n_estimators'],
+                                   # Minimal samples to split
+                                   min_samples_split=best_params['min_samples_split'])
+    # Train the model   
+    model.fit(X_train, y_train)
+    # If predicted probability is largr than threshold (default value is 0.5), generate a positive label
+    predicted_proba = model.predict_proba(X_test)
+    yp = (predicted_proba [:,1] >= threshold).astype('int')
+    return yp, model
+rs = 123
+def evaluate(yt, yp, eval_type="Original"):
+    results_pos = {}
+    results_pos['type'] = eval_type
+    # Accuracy
+    results_pos['accuracy'] = accuracy_score(yt, yp)
+    # Precision, recall, Fscore
+    precision, recall, f_beta, _ = precision_recall_fscore_support(yt, yp, beta=5, pos_label=1, average='binary')
+    results_pos['recall'] = recall
+    # AUC
+    results_pos['auc'] = roc_auc_score(yt, yp)
+    # Precision
+    results_pos['precision'] = precision
+    # Fscore
+    results_pos['fscore'] = f_beta
+    return results_pos
+def resample(X_train, y_train):
+    # SMOTE sampler (Oversampling)
+    smote_sampler = SMOTE(random_state = 123)
+    # Undersampling
+    under_sampler = RandomUnderSampler(random_state=123)
+    # Resampled datasets
+    X_smo, y_smo = smote_sampler.fit_resample(X_train, y_train)
+    X_under, y_under = under_sampler.fit_resample(X_train, y_train)
+    return X_smo, y_smo, X_under, y_under
+def visualize_eval_metrics(results):
+    df = pd.DataFrame(data=results)
+    #table = pd.pivot_table(df, values='type', index=['accuracy', 'precision', 'recall', 'f1', 'auc'],
+    #                columns=['type'])
+    #df = df.set_index('type').transpose()
+    print(df)
+    x = np.arange(5)
+    original = df.iloc[0, 1:].values
+    class_weight = df.iloc[1, 1:].values
+    smote = df.iloc[2, 1:].values
+    under = df.iloc[3, 1:].values
+    width = 0.2
+    figure(figsize=(12, 10), dpi=80)
+    plt.bar(x-0.2, original, width, color='#95a5a6')
+    plt.bar(x, class_weight, width, color='#d35400')
+    plt.bar(x+0.2, smote, width, color='#2980b9')
+    plt.bar(x+0.4, under, width, color='#3498db')
+    plt.xticks(x, ['Accuracy', 'Recall', 'AUC', 'Precision', 'Fscore'])
+    plt.xlabel("Evaluation Metrics")
+    plt.ylabel("Score")
+    plt.legend(["Original", "Class Weight", "SMOTE", "Undersampling"])
+    plt.show()
+churn_df = pd.read_csv("https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBM-ML201EN-SkillsNetwork/labs/module_4/datasets/im_churn.csv", index_col=False)
+churn_df.head()
+X_train, X_test, y_train, y_test = split_data(churn_df)
+y_train.value_counts().plot.bar(color=['green', 'red'])
+# Tuned random forest parameters
+best_params_no_weight = {'bootstrap': True,
+                         'class_weight': None, 
+                         'max_depth': 10, 
+                         'min_samples_split': 5, 
+                         'n_estimators': 50}
+results = []
+preds, model = build_rf(X_train, y_train, X_test, best_params=best_params_no_weight)
+result = evaluate(y_test, preds, "Original")
+print(result)
+results.append(result)
+class_weight = {}
+# 0.2 to Non-churn class
+class_weight[0] = 0.2
+# 0.8 to Churn class
+class_weight[1] = 0.8
+# Pre-tuned hyper parameters
+best_params_weight = {'bootstrap': True,
+                         'class_weight': class_weight, 
+                         'max_depth': 10, 
+                         'min_samples_split': 5, 
+                         'n_estimators': 50}
+# class weight
+preds_cw, weight_model = build_rf(X_train, y_train, X_test, best_params=best_params_weight)
+result = evaluate(y_test, preds_cw, "Class Weight")
+print(result)
+results.append(result)
+# X_smo is resampled from X_train using SMOTE
+# y_smo is resampled from y_train using SMOTE
+# X_under is resampled from X_train using Undersampling
+# y_under is resampled from y_train using Undersampling
+X_smo, y_smo, X_under, y_under = resample(X_train, y_train)
+preds_smo, smo_model = build_rf(X_smo, y_smo, X_test, best_params=best_params_no_weight)
+result = evaluate(y_test, preds_smo, "SMOTE")
+print(result)
+results.append(result)
+preds_under, under_model = build_rf(X_under, y_under, X_test, best_params=best_params_no_weight)
+result = evaluate(y_test, preds_under, "Undersampling")
+print(result)
+results.append(result)
+visualize_eval_metrics(results)
+tumor_df = pd.read_csv("https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBM-ML201EN-SkillsNetwork/labs/module_4/datasets/im_cancer.csv", index_col=False)
+X_train, X_test, y_train, y_test = split_data(tumor_df)
+y_train.value_counts().plot.bar(color=['green', 'red'])
+X_smo, y_smo, X_under, y_under = resample(X_train, y_train)
+best_params_weight = {'bootstrap': True,
+                         'class_weight': {0: 0.2, 1: 0.8}, 
+                         'max_depth': 10, 
+                         'min_samples_split': 5, 
+                         'n_estimators': 50}
+# no class-weights
+results=[]
+preds, model = build_rf(X_train, y_train, X_test)
+results.append(evaluate(y_test, preds))
+# class weight
+preds, model = build_rf(X_train, y_train, X_test, best_params=best_params_weight)
+results.append(evaluate(y_test, preds))
+# Resampling
+preds, model = build_rf(X_smo, y_smo, X_test)
+results.append(evaluate(y_test, preds))
+preds, model = build_rf(X_under, y_under, X_test)
+results.append(evaluate(y_test, preds))
+visualize_eval_metrics(results)
+# Load the dataset
+hr_df = pd.read_csv("https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBM-ML201EN-SkillsNetwork/labs/module_4/datasets/im_hr.csv", index_col=False)
+y_train.value_counts().plot.bar(color=['green', 'red'])
+best_params = {'class_weight': {0: 0.1, 1: 0.9}}
+results = []
+# no class-weights
+preds, model = build_lr(X_train, y_train, X_test)
+result = evaluate(y_test, preds)
+results.append(result)
+# class weight
+preds, weight_model = build_lr(X_train, y_train, X_test, best_params=best_params)
+result = evaluate(y_test, preds, eval_type="Class Weight")
+results.append(result)
+# Resampling
+preds, smote_model = build_lr(X_smo, y_smo, X_test)
+result = evaluate(y_test, preds, eval_type="SMOTE")
+results.append(result)
+preds_under, under_model = build_lr(X_under, y_under, X_test)
+result = evaluate(y_test, preds_under, eval_type="Undersampling")
+#metrics.plot_roc_curve(smote_model, X_test, y_test) 
+results.append(result)
+visualize_eval_metrics(results)

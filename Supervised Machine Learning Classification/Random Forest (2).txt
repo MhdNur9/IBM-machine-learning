@@ -1,0 +1,135 @@
+import pandas as pd
+import pylab as plt
+import numpy as np
+import scipy.optimize as opt
+from sklearn import preprocessing
+%matplotlib inline 
+import matplotlib.pyplot as plt
+from sklearn import metrics
+from tqdm import tqdm
+
+import warnings
+warnings.filterwarnings('ignore')
+def get_accuracy(X_train, X_test, y_train, y_test, model):
+    return  {"test Accuracy":metrics.accuracy_score(y_test, model.predict(X_test)),"trian Accuracy": metrics.accuracy_score(y_train, model.predict(X_train))}
+
+def get_correlation(X_test, y_test,models):
+    #This function calculates the average correlation between predictors  
+    n_estimators=len(models.estimators_)
+    prediction=np.zeros((y_test.shape[0],n_estimators))
+    predictions=pd.DataFrame({'estimator '+str(n+1):[] for n in range(n_estimators)})
+    
+    for key,model in zip(predictions.keys(),models.estimators_):
+        predictions[key]=model.predict(X_test.to_numpy())
+    
+    corr=predictions.corr()
+    print("Average correlation between predictors: ", corr.mean().mean()-1/n_estimators)
+    return corr
+
+churn_df = pd.read_csv("https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBMDeveloperSkillsNetwork-ML0101EN-SkillsNetwork/labs/Module%203/data/ChurnData.csv")
+
+churn_df.head()
+churn_df = churn_df[['tenure', 'age', 'address', 'income', 'ed', 'employ', 'equip', 'callcard', 'wireless','churn']]
+churn_df['churn'] = churn_df['churn'].astype('int')
+churn_df.head()
+from sklearn.utils import resample
+churn_df[0:5]
+for n in range(5):
+
+    print(resample(churn_df[0:5]))
+X=churn_df[['tenure', 'age', 'address', 'income', 'ed', 'employ', 'equip']]
+M=X.shape[1]
+M
+m=3
+feature_index= range(M)
+feature_index
+import random
+random.sample(feature_index,m)
+for n in range(5):
+
+    print("sample {}".format(n))
+    print(resample(X[0:5]).iloc[:,random.sample(feature_index,m)])
+y = churn_df['churn']
+y.head()
+from sklearn.model_selection import train_test_split
+X_train, X_test, y_train, y_test = train_test_split( X, y, test_size=0.3, random_state=1)
+print ('Train set', X_train.shape,  y_train.shape)
+print ('Test set', X_test.shape,  y_test.shape)
+from sklearn.ensemble import BaggingClassifier
+from sklearn.tree import DecisionTreeClassifier
+n_estimators=20
+Bag= BaggingClassifier(base_estimator=DecisionTreeClassifier(criterion="entropy", max_depth = 4,random_state=2),n_estimators=n_estimators,random_state=0,bootstrap=True)
+Bag.fit(X_train,y_train)
+Bag.predict(X_test).shape
+print(get_accuracy(X_train, X_test, y_train, y_test,  Bag))
+get_correlation(X_test, y_test,Bag).style.background_gradient(cmap='coolwarm')
+
+from sklearn.ensemble import RandomForestClassifier
+n_estimators=20
+M_features=X.shape[1]
+max_features=round(np.sqrt(M_features))-1
+max_features
+y_test
+model = RandomForestClassifier( max_features=max_features,n_estimators=n_estimators, random_state=0)
+model.fit(X_train,y_train)
+print(get_accuracy(X_train, X_test, y_train, y_test, model))
+get_correlation(X_test, y_test,model).style.background_gradient(cmap='coolwarm')
+df = pd.read_csv("https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBMDeveloperSkillsNetwork-ML0101EN-SkillsNetwork/labs/Module%203/data/cell_samples.csv")
+
+df.head()
+df= df[pd.to_numeric(df['BareNuc'], errors='coerce').notnull()]
+X =  df[['Clump', 'UnifSize', 'UnifShape', 'MargAdh', 'SingEpiSize', 'BareNuc', 'BlandChrom', 'NormNucl', 'Mit']]
+
+X.head()
+y=df['Class']
+y.head()
+X_train, X_test, y_train, y_test = train_test_split( X, y, test_size=0.2, random_state=4)
+print ('Train set:', X_train.shape,  y_train.shape)
+print ('Test set:', X_test.shape,  y_test.shape)
+from sklearn.model_selection import GridSearchCV
+model = RandomForestClassifier()
+model.get_params().keys()
+param_grid = {'n_estimators': [2*n+1 for n in range(20)],
+             'max_depth' : [2*n+1 for n in range(10) ],
+             'max_features':["auto", "sqrt", "log2"]}
+search = GridSearchCV(estimator=model, param_grid=param_grid,scoring='accuracy')
+search.fit(X_train, y_train)
+search.best_score_
+search.best_params_
+
+print(get_accuracy(X_train, X_test, y_train, y_test, search.best_estimator_))
+df = pd.read_csv("https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBMDeveloperSkillsNetwork-ML0101EN-SkillsNetwork/labs/Module%203/data/drug200.csv", delimiter=",")
+df.head()
+X = df[['Age', 'Sex', 'BP', 'Cholesterol', 'Na_to_K']].values
+X[0:5]
+y = df["Drug"]
+y[0:5]
+from sklearn import preprocessing
+le_sex = preprocessing.LabelEncoder()
+le_sex.fit(['F','M'])
+X[:,1] = le_sex.transform(X[:,1]) 
+
+
+le_BP = preprocessing.LabelEncoder()
+le_BP.fit([ 'LOW', 'NORMAL', 'HIGH'])
+X[:,2] = le_BP.transform(X[:,2])
+
+
+le_Chol = preprocessing.LabelEncoder()
+le_Chol.fit([ 'NORMAL', 'HIGH'])
+X[:,3] = le_Chol.transform(X[:,3]) 
+
+X[0:5]
+X_train, X_test, y_train, y_test = train_test_split( X, y, test_size=0.2, random_state=4)
+print ('Train set:', X_train.shape,  y_train.shape)
+print ('Test set:', X_test.shape,  y_test.shape)
+param_grid = {'n_estimators': [2*n+1 for n in range(20)],
+             'max_depth' : [2*n+1 for n in range(10) ],
+             'max_features':["auto", "sqrt", "log2"]}
+model = RandomForestClassifier()
+search = GridSearchCV(estimator=model, param_grid=param_grid,scoring='accuracy', cv=3)
+search.fit(X_train, y_train)
+search.best_score_
+search.best_params_
+print(get_accuracy(X_train, X_test, y_train, y_test, search.best_estimator_))
+

@@ -1,0 +1,7 @@
+https://www.coursera.org/learn/supervised-machine-learning-classification/ungradedLti/JWIR5/practice-lab-bagging
+https://www.coursera.org/learn/supervised-machine-learning-classification/ungradedLti/Re9Bf/demo-lab-boosting-and-stacking
+https://www.coursera.org/learn/supervised-machine-learning-classification/ungradedLti/PdUHJ/practice-lab-ada-boost
+https://www.coursera.org/learn/supervised-machine-learning-classification/ungradedLti/WWowf/practice-lab-stacking-for-classification-with-python
+https://www.coursera.org/learn/supervised-machine-learning-classification/ungradedLti/CGNI1/practice-lab-optional-gradient-boosting
+https://www.coursera.org/learn/supervised-machine-learning-classification/ungradedLti/usgu1/practice-lab-model-interpretability
+https://www.coursera.org/learn/supervised-machine-learning-classification/ungradedLti/EIFBw/practice-lab-modeling-imbalanced-classes

@@ -1,0 +1,182 @@
+import pandas as pd
+import pylab as plt
+import numpy as np
+import scipy.optimize as opt
+from sklearn import preprocessing
+%matplotlib inline 
+import matplotlib.pyplot as plt
+from sklearn import metrics
+from tqdm import tqdm
+
+import warnings
+warnings.filterwarnings('ignore')
+def get_accuracy(X_train, X_test, y_train, y_test, model):
+    return  {"test Accuracy":metrics.accuracy_score(y_test, model.predict(X_test)),"trian Accuracy": metrics.accuracy_score(y_train, model.predict(X_train))}
+def get_accuracy_bag(X,y,title,times=20,xlabel='Number Estimators',Learning_rate_=[0.2,0.4,0.6,1]):
+
+    lines_array=['solid','--', '-.', ':']
+
+    N_estimators=[n for n in range(1,100)]
+    
+    times=20
+    train_acc=np.zeros((times,len(Learning_rate_),len(N_estimators)))
+    test_acc=np.zeros((times,len(Learning_rate_),len(N_estimators)))
+
+
+    #Iterate through different number of Learning rate  and average out the results  
+    for n in tqdm(range(times)):
+        X_train, X_test, y_train, y_test = train_test_split( X, y, test_size=0.3)
+        for n_estimators in N_estimators:
+            for j,lr in enumerate(Learning_rate_):
+
+
+                model = AdaBoostClassifier(n_estimators=n_estimators+1,random_state=0,learning_rate=lr)
+
+
+                model.fit(X_train,y_train)
+
+
+
+                Accuracy=get_accuracy(X_train, X_test, y_train, y_test,  model)
+
+
+
+                train_acc[n,j,n_estimators-1]=Accuracy['trian Accuracy']
+                test_acc[n,j,n_estimators-1]=Accuracy['test Accuracy']
+
+
+
+
+    fig, ax1 = plt.subplots()
+    mean_test=test_acc.mean(axis=0)
+    mean_train=train_acc.mean(axis=0)
+    ax2 = ax1.twinx()
+
+    for j,(lr,line) in enumerate(zip(Learning_rate_,lines_array)): 
+
+        ax1.plot(mean_train[j,:],linestyle = line,color='b',label="Learning rate "+str(lr))
+        ax2.plot(mean_test[j,:],linestyle = line, color='r',label=str(lr))
+
+    ax1.set_ylabel('Training accuracy',color='b')
+    ax1.legend()
+    ax2.set_ylabel('Testing accuracy', color='r')
+    ax2.legend()
+    plt.show()
+churn_df = pd.read_csv("https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBMDeveloperSkillsNetwork-ML0101EN-SkillsNetwork/labs/Module%203/data/ChurnData.csv")
+
+churn_df.head()
+churn_df = churn_df[['tenure', 'age', 'address', 'income', 'ed', 'employ', 'equip', 'callcard', 'wireless','churn']]
+churn_df['churn'] = churn_df['churn'].astype('int')
+churn_df.head()
+X=churn_df[['tenure', 'age', 'address', 'income', 'ed', 'employ', 'equip']]
+y = churn_df['churn']
+y.head()
+from sklearn.model_selection import train_test_split
+X_train, X_test, y_train, y_test = train_test_split( X, y, test_size=0.3, random_state=1)
+print ('Train set', X_train.shape,  y_train.shape)
+print ('Test set', X_test.shape,  y_test.shape)
+from sklearn.ensemble import AdaBoostClassifier
+n_estimators=5
+random_state=0
+model = AdaBoostClassifier(n_estimators=n_estimators,random_state=random_state)
+model.fit(X_train, y_train)
+y_pred = model.predict(X_test)
+y_pred 
+print(get_accuracy(X_train, X_test, y_train, y_test,  model))
+model.base_estimator_
+model.estimators_
+[ ("for weak classifiers {} the we get ".format(i+1),get_accuracy(X_train, X_test, y_train, y_test,  weak_classifiers)) for i,weak_classifiers in enumerate(model.estimators_)]
+n_estimators=100
+random_state=0
+model = AdaBoostClassifier(n_estimators=n_estimators,random_state=random_state)
+model.fit(X_train, y_train)
+
+#Predict the response for test dataset
+y_pred = model.predict(X_test)
+print(get_accuracy(X_train, X_test, y_train, y_test, model))
+get_accuracy_bag(X,y,title="Training and Test Accuracy vs Weak Classifiers",Learning_rate_=[1],times=20,xlabel='Number Estimators')
+n_estimators=100
+random_state=0
+learning_rate=0.7
+model = AdaBoostClassifier(n_estimators=n_estimators,random_state=random_state,learning_rate=learning_rate)
+model.fit(X_train, y_train)
+y_pred = model.predict(X_test)
+print(get_accuracy(X_train, X_test, y_train, y_test, model))
+get_accuracy_bag(X,y,title="Training and Test Accuracy vs Weak Classifiers",Learning_rate_=[0.2,0.4,0.6,1],times=20,xlabel='Number Estimators')
+from sklearn.svm import SVC
+base_estimator=SVC(kernel='rbf',gamma=1)
+base_estimator.fit(X_train, y_train)
+
+print(get_accuracy(X_train, X_test, y_train, y_test, base_estimator))
+#base_estimator.predict_proba(X_train)
+algorithm='SAMME'
+model =AdaBoostClassifier(n_estimators=5, base_estimator=base_estimator,learning_rate=1,algorithm='SAMME' )
+model.fit(X_train, y_train)
+
+#Predict the response for test dataset
+y_pred = model.predict(X_test)
+print(get_accuracy(X_train, X_test, y_train, y_test, model))
+df = pd.read_csv("https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBMDeveloperSkillsNetwork-ML0101EN-SkillsNetwork/labs/Module%203/data/cell_samples.csv")
+
+df.head()
+df= df[pd.to_numeric(df['BareNuc'], errors='coerce').notnull()]
+X =  df[['Clump', 'UnifSize', 'UnifShape', 'MargAdh', 'SingEpiSize', 'BareNuc', 'BlandChrom', 'NormNucl', 'Mit']]
+
+X.head()
+y=df['Class']
+y.head()
+X_train, X_test, y_train, y_test = train_test_split( X, y, test_size=0.2, random_state=4)
+print ('Train set:', X_train.shape,  y_train.shape)
+print ('Test set:', X_test.shape,  y_test.shape)
+from sklearn.model_selection import GridSearchCV
+model = AdaBoostClassifier()
+model.get_params().keys()
+param_grid = {'learning_rate': [0.1*(n+1) for n in range(10)],
+             'n_estimators' : [2*n+1 for n in range(10)],
+              'algorithm':['SAMME', 'SAMME.R']}                
+
+param_grid 
+search = GridSearchCV(estimator=model, param_grid=param_grid,scoring='accuracy')
+search.fit(X_train, y_train)
+search.best_score_
+search.best_params_
+
+print(get_accuracy(X_train, X_test, y_train, y_test, search.best_estimator_))
+df = pd.read_csv("https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBMDeveloperSkillsNetwork-ML0101EN-SkillsNetwork/labs/Module%203/data/drug200.csv", delimiter=",")
+df.head()
+X = df[['Age', 'Sex', 'BP', 'Cholesterol', 'Na_to_K']].values
+X[0:5]
+y = df["Drug"]
+y[0:5]
+from sklearn import preprocessing
+le_sex = preprocessing.LabelEncoder()
+le_sex.fit(['F','M'])
+X[:,1] = le_sex.transform(X[:,1]) 
+
+
+le_BP = preprocessing.LabelEncoder()
+le_BP.fit([ 'LOW', 'NORMAL', 'HIGH'])
+X[:,2] = le_BP.transform(X[:,2])
+
+
+le_Chol = preprocessing.LabelEncoder()
+le_Chol.fit([ 'NORMAL', 'HIGH'])
+X[:,3] = le_Chol.transform(X[:,3]) 
+
+X[0:5]
+X_train, X_test, y_train, y_test = train_test_split( X, y, test_size=0.2, random_state=4)
+print ('Train set:', X_train.shape,  y_train.shape)
+print ('Test set:', X_test.shape,  y_test.shape)
+param_grid = {'learning_rate': [0.1*(n+1) for n in range(10)],
+             'n_estimators' : [2*n+1 for n in range(10)],
+              'algorithm':['SAMME', 'SAMME.R']}                
+
+param_grid 
+model = AdaBoostClassifier()
+model = RandomForestClassifier()
+search = GridSearchCV(estimator=model, param_grid=param_grid,scoring='accuracy', cv=3)
+search.fit(X_train, y_train)
+search.best_score_
+search.best_params_
+print(get_accuracy(X_train, X_test, y_train, y_test, search.best_estimator_))
+print(get_accuracy(X_train, X_test, y_train, y_test, search.best_estimator_))
